@@ -89,10 +89,7 @@ export async function listUserByPage(body: API.UserQueryRequest, options?: { [ke
 }
 
 /** 此处后端没有提供注释 POST /user/list/page/vo */
-export async function listUserVoByPage(
-  body: API.UserQueryRequest,
-  options?: { [key: string]: any }
-) {
+export async function listUserVoByPage(body: API.UserQueryRequest, options?: { [key: string]: any }) {
   return request<API.BaseResponsePageUserVO>('/user/list/page/vo', {
     method: 'POST',
     headers: {
@@ -123,11 +120,20 @@ export async function userLogout(options?: { [key: string]: any }) {
   })
 }
 
+/** 此处后端没有提供注释 POST /user/multi/delete */
+export async function multiDeleteUser(body: API.DeleteRequest[], options?: { [key: string]: any }) {
+  return request<API.BaseResponseBoolean>('/user/multi/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
 /** 此处后端没有提供注释 POST /user/register */
-export async function userRegister(
-  body: API.UserRegisterRequest,
-  options?: { [key: string]: any }
-) {
+export async function userRegister(body: API.UserRegisterRequest, options?: { [key: string]: any }) {
   return request<API.BaseResponseLong>('/user/register', {
     method: 'POST',
     headers: {
