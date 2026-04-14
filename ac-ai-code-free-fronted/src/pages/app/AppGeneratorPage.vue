@@ -2,7 +2,7 @@
   <div id="appGeneratorPage">
     <div class="top-nav">
       <div class="left">
-        <a-button type="text" @click="router.back()">
+        <a-button type="text" @click="handleBack">
           <template #icon><left-outlined /></template>
         </a-button>
         <span class="app-name">{{ app?.appName || '新应用' }}</span>
@@ -22,7 +22,7 @@
 
     <div class="main-content">
       <!-- 左侧对话区 -->
-      <div class="chat-panel">
+      <div class="chat-panel" :style="{ width: `${chatPanelWidth}px` }">
         <div class="session-panel">
           <div class="session-panel-header">
             <span>会话记录</span>
@@ -32,7 +32,7 @@
             <div
               v-for="(session, index) in sessions"
               :key="session.id || index"
-              :class="['session-item', session.id === currentSessionId ? 'active' : '']"
+              :class="['session-item', normalizeId(session.id) === currentSessionId ? 'active' : '']"
               @click="handleSwitchSession(session.id)"
             >
               <div class="session-title">{{ session.title || `会话 ${index + 1}` }}</div>
@@ -83,6 +83,8 @@
         </div>
       </div>
 
+      <div class="panel-splitter" @mousedown="startResize" />
+
       <!-- 右侧预览区 -->
       <div class="preview-panel">
         <div class="preview-header">
@@ -115,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { 
@@ -133,46 +135,79 @@ import { useLoginUserStore } from '@/stores/LoginUser'
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
-const appId = route.params.id as string
+const appId = String(route.params.id ?? '')
 
 const app = ref<API.AppVO>()
 const messages = ref<{ role: 'user' | 'ai', content: string }[]>([])
 const sessions = ref<API.ChatSessionVO[]>([])
-const currentSessionId = ref<number>()
+const currentSessionId = ref<string>()
 const inputText = ref('')
 const generating = ref(false)
 const deployLoading = ref(false)
 const sessionLoading = ref(false)
+const sessionInitializing = ref(false)
 const previewType = ref('desktop')
 const iframeUrl = ref('')
 const messageListRef = ref<HTMLElement>()
+const entryPathStorageKey = `app_generate_entry_${appId}`
+const chatPanelWidth = ref(450)
+const resizing = ref(false)
+const resizeStartX = ref(0)
+const resizeStartWidth = ref(450)
+
+const normalizeId = (id?: string | number | null) => {
+  if (id === undefined || id === null) {
+    return ''
+  }
+  return String(id)
+}
+
+const ensureValidAppId = () => {
+  if (!appId) {
+    message.error('应用 ID 无效，请返回列表重新进入')
+    return false
+  }
+  return true
+}
 
 const loadSessions = async () => {
+  if (!ensureValidAppId()) {
+    return
+  }
   sessionLoading.value = true
   try {
-    const res = await listChatSession({ appId: Number(appId) })
+    const res = await listChatSession({ appId: appId as any })
     if (res.data?.code === 0) {
       sessions.value = res.data.data || []
+      return
     }
+    message.error('加载会话失败，' + (res.data?.message || '请稍后重试'))
   } finally {
     sessionLoading.value = false
   }
 }
 
 const createSession = async () => {
-  const res = await createChatSession({ appId: Number(appId) })
+  if (!ensureValidAppId()) {
+    return undefined
+  }
+  const res = await createChatSession({ appId: appId as any })
   if (res.data?.code === 0 && res.data.data) {
+    const sessionId = normalizeId(res.data.data)
     await loadSessions()
-    return res.data.data
+    return sessionId
   }
   message.error('创建会话失败，' + (res.data?.message || '请稍后重试'))
   return undefined
 }
 
-const loadRemoteHistory = async (sessionId: number) => {
+const loadRemoteHistory = async (sessionId: string) => {
+  if (!ensureValidAppId()) {
+    return
+  }
   const res = await listChatHistoryByPage({
-    appId: Number(appId),
-    sessionId,
+    appId: appId as any,
+    sessionId: sessionId as any,
     pageNum: 1,
     pageSize: 200,
   })
@@ -190,14 +225,17 @@ const loadRemoteHistory = async (sessionId: number) => {
  * 加载应用信息
  */
 const loadApp = async () => {
-  const res = await getAppVoById({ id: Number(appId) })
+  if (!ensureValidAppId()) {
+    return
+  }
+  const res = await getAppVoById({ id: appId as any })
   if (res.data?.code === 0) {
     app.value = res.data.data
 
     await loadSessions()
     if (sessions.value.length > 0 && sessions.value[0].id) {
-      currentSessionId.value = sessions.value[0].id
-      await loadRemoteHistory(sessions.value[0].id)
+      currentSessionId.value = normalizeId(sessions.value[0].id)
+      await loadRemoteHistory(currentSessionId.value)
       updatePreview()
     } else {
       const newSessionId = await createSession()
@@ -209,13 +247,15 @@ const loadApp = async () => {
         startSSE(app.value.initPrompt, currentSessionId.value)
       }
     }
+    return
   }
+  message.error('加载应用失败，' + (res.data?.message || '请稍后重试'))
 }
 
 /**
  * SSE 对话逻辑
  */
-const startSSE = (userMsg: string, sessionId: number) => {
+const startSSE = (userMsg: string, sessionId: string) => {
   generating.value = true
   const aiMsgIndex = messages.value.length
   messages.value.push({ role: 'ai', content: '' })
@@ -230,7 +270,7 @@ const startSSE = (userMsg: string, sessionId: number) => {
     try {
       const data = JSON.parse(event.data)
       if (data.sessionId) {
-        currentSessionId.value = Number(data.sessionId)
+        currentSessionId.value = normalizeId(data.sessionId)
       }
     } catch (e) {
       console.error('SSE Meta Parse Error', e)
@@ -274,16 +314,36 @@ const startSSE = (userMsg: string, sessionId: number) => {
   }
 }
 
-const doChat = () => {
+const ensureSessionReady = async () => {
+  if (currentSessionId.value) {
+    return currentSessionId.value
+  }
+  if (sessionInitializing.value) {
+    return undefined
+  }
+  sessionInitializing.value = true
+  try {
+    const sessionId = await createSession()
+    if (sessionId) {
+      currentSessionId.value = sessionId
+    }
+    return sessionId
+  } finally {
+    sessionInitializing.value = false
+  }
+}
+
+const doChat = async () => {
   if (generating.value || !inputText.value) return
-  if (!currentSessionId.value) {
+  const sessionId = await ensureSessionReady()
+  if (!sessionId) {
     message.warning('会话初始化中，请稍后再试')
     return
   }
   const msg = inputText.value
   messages.value.push({ role: 'user', content: msg })
   inputText.value = ''
-  startSSE(msg, currentSessionId.value)
+  startSSE(msg, sessionId)
 }
 
 const handleEnter = (e: KeyboardEvent) => {
@@ -323,13 +383,13 @@ const handleCreateSession = async () => {
   }
 }
 
-const handleSwitchSession = async (sessionId?: number) => {
-  if (!sessionId || generating.value || sessionId === currentSessionId.value) {
+const handleSwitchSession = async (sessionId?: string | number) => {
+  const normalizedSessionId = normalizeId(sessionId)
+  if (!normalizedSessionId || generating.value || normalizedSessionId === currentSessionId.value) {
     return
   }
-  currentSessionId.value = sessionId
-  await loadRemoteHistory(sessionId)
-  updatePreview()
+  currentSessionId.value = normalizedSessionId
+  await loadRemoteHistory(normalizedSessionId)
 }
 
 const formatSessionTime = (time?: string) => {
@@ -349,7 +409,7 @@ const formatSessionTime = (time?: string) => {
 const doDeploy = async () => {
   deployLoading.value = true
   try {
-    const res = await deployApp({ appId: Number(appId) })
+    const res = await deployApp({ appId: appId as any })
     if (res.data?.code === 0) {
       message.success('部署成功！地址：' + res.data.data)
       loadApp()
@@ -377,7 +437,57 @@ const scrollToBottom = () => {
 }
 
 onMounted(() => {
+  const backPath = (window.history.state?.back as string | undefined) || ''
+  const forwardPath = (window.history.state?.forward as string | undefined) || ''
+  if (backPath && !backPath.includes('/app/generate/')) {
+    sessionStorage.setItem(entryPathStorageKey, backPath)
+  }
+
+  const navigationEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[]
+  const navigationType = navigationEntries[0]?.type || ''
+  const entryPath = sessionStorage.getItem(entryPathStorageKey) || ''
+  if (navigationType === 'back_forward' && forwardPath.includes('/app/generate/') && entryPath) {
+    router.replace(entryPath)
+    return
+  }
+
   loadApp()
+})
+
+const handleBack = async () => {
+  const targetPath = sessionStorage.getItem(entryPathStorageKey) || '/app/my'
+  await router.replace(targetPath)
+}
+
+const resizePanel = (event: MouseEvent) => {
+  if (!resizing.value) {
+    return
+  }
+  const deltaX = event.clientX - resizeStartX.value
+  const nextWidth = resizeStartWidth.value + deltaX
+  const minWidth = 320
+  const maxWidth = Math.floor(window.innerWidth * 0.7)
+  chatPanelWidth.value = Math.max(minWidth, Math.min(nextWidth, maxWidth))
+}
+
+const stopResize = () => {
+  resizing.value = false
+  document.body.style.userSelect = ''
+  window.removeEventListener('mousemove', resizePanel)
+  window.removeEventListener('mouseup', stopResize)
+}
+
+const startResize = (event: MouseEvent) => {
+  resizing.value = true
+  resizeStartX.value = event.clientX
+  resizeStartWidth.value = chatPanelWidth.value
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', resizePanel)
+  window.addEventListener('mouseup', stopResize)
+}
+
+onUnmounted(() => {
+  stopResize()
 })
 </script>
 
@@ -413,11 +523,25 @@ onMounted(() => {
 
 /* 对话面板 */
 .chat-panel {
-  width: 450px;
   border-right: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
   background: #fff;
+  min-width: 320px;
+  max-width: 70vw;
+  flex-shrink: 0;
+}
+
+.panel-splitter {
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.panel-splitter:hover {
+  background: #f0f0f0;
 }
 
 .session-panel {
