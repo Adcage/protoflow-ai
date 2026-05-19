@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -292,8 +293,7 @@ class AppControllerTest {
         appPage.setRecords(new ArrayList<>());
         appPage.setTotalRow(0);
 
-        when(appService.page(any(Page.class), any(QueryWrapper.class))).thenReturn(appPage);
-        when(appService.getQueryWrapper(any(AppQueryRequest.class))).thenReturn(new QueryWrapper());
+        when(appService.listGoodAppPage(anyLong(), anyLong(), any(AppQueryRequest.class))).thenReturn(appPage);
         when(appService.getAppVOList(any())).thenReturn(new ArrayList<>());
 
         mockMvc.perform(post("/app/good/list/page/vo")

@@ -2,6 +2,7 @@ package com.adcage.acaicodefree.core;
 
 import com.adcage.acaicodefree.ai.AiCodeGenServiceFactory;
 import com.adcage.acaicodefree.ai.AiCodeGeneratorService;
+import com.adcage.acaicodefree.ai.guardrail.PromptSafetyInputGuardrail;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -26,6 +27,9 @@ class AiCodeGeneratorFacadeTest {
 
     @Mock
     private AiCodeGeneratorService aiCodeGeneratorService;
+
+    @Mock
+    private PromptSafetyInputGuardrail promptSafetyInputGuardrail;
 
     @InjectMocks
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;

@@ -3,6 +3,7 @@ package com.adcage.acaicodefree.core;
 import cn.hutool.json.JSONUtil;
 import com.adcage.acaicodefree.ai.AiCodeGenServiceFactory;
 import com.adcage.acaicodefree.ai.AiCodeGeneratorService;
+import com.adcage.acaicodefree.ai.guardrail.PromptSafetyInputGuardrail;
 import com.adcage.acaicodefree.ai.model.message.AiResponseMessage;
 import com.adcage.acaicodefree.ai.model.message.StreamMessageTypeEnum;
 import com.adcage.acaicodefree.ai.model.message.ToolExecutedMessage;
@@ -35,6 +36,9 @@ class AiCodeGeneratorFacadeStreamMessageTest {
 
     @Mock
     private AiCodeGeneratorService aiCodeGeneratorService;
+
+    @Mock
+    private PromptSafetyInputGuardrail promptSafetyInputGuardrail;
 
     @InjectMocks
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
