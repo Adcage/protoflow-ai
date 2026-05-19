@@ -33,6 +33,9 @@ public class AiCodeGenServiceFactory {
     @Resource(name = "reasoningStreamingChatModel")
     private StreamingChatLanguageModel reasoningStreamingChatModel;
 
+    @Resource(name = "routingChatModel")
+    private ChatLanguageModel routingChatModel;
+
     @Resource
     private ToolManager toolManager;
 
@@ -41,6 +44,9 @@ public class AiCodeGenServiceFactory {
 
     @Value("${app.ai.vue-project.memory-window-size:20}")
     private int memoryWindowSize;
+
+    @Value("${app.ai.max-sequential-tools-invocations:20}")
+    private int maxSequentialToolsInvocations;
 
     private final Cache<String, AiCodeGeneratorService> serviceCache = Caffeine.newBuilder()
             .maximumSize(1000)
@@ -70,12 +76,18 @@ public class AiCodeGenServiceFactory {
      * 创建带工具的服务（统一使用）
      */
     protected AiCodeGeneratorService createToolService(Long appId, StreamingChatLanguageModel streamingChatLanguageModel) {
+        log.info("工具调用上限配置: maxSequentialToolsInvocations={}, 注意: LangChain4j 0.36.2 不支持通过 builder API 设置此参数，当前由框架内部硬编码为 100，配置值将在升级后生效",
+                maxSequentialToolsInvocations);
         return AiServices.builder(AiCodeGeneratorService.class)
                 .chatLanguageModel(chatModel)
                 .streamingChatLanguageModel(streamingChatLanguageModel)
                 .tools(toolManager.getAllTools())
                 .chatMemoryProvider(memoryId -> resolveChatMemory(memoryId, appId))
                 .build();
+    }
+
+    public ChatLanguageModel getRoutingModel() {
+        return routingChatModel;
     }
 
     ChatMemory resolveChatMemory(Object memoryId, Long appId) {

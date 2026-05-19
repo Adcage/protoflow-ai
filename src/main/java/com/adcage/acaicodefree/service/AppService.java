@@ -109,4 +109,14 @@ public interface AppService extends IService<App> {
      * @return 部署后的访问 URL
      */
     String deployApp(Long appId, User loginUser);
+
+    /**
+     * 缓存查询精选应用分页
+     *
+     * @param pageNum         页码
+     * @param pageSize        页大小
+     * @param appQueryRequest 查询请求
+     * @return 应用分页
+     */
+    Page<App> listGoodAppPage(long pageNum, long pageSize, AppQueryRequest appQueryRequest);
 }

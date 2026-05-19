@@ -48,6 +48,7 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -282,8 +283,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                     String extra = null;
                     if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
                         try {
+                            log.info("Vue 项目构建开始, appId={}, sessionId={}", appId, sessionId);
                             vueProjectBuildService.buildVueProject(appId);
                             aiMessage = aiMessage + "\n构建完成：已生成 dist 产物";
+                            log.info("Vue 项目构建完成, appId={}, sessionId={}, latencyMs={}", appId, sessionId, latencyMs);
                         } catch (Exception e) {
                             status = "failed";
                             aiMessage = aiMessage + "\n构建失败：" + e.getMessage();
@@ -465,6 +468,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         triggerCoverGenerationAsync(appId, deployKey, app.getCover());
         // 9. 返回可访问的 URL
         return buildDeployUrl(deployKey);
+    }
+
+    @Override
+    @Cacheable(cacheNames = "good_app_page", key = "T(com.adcage.acaicodefree.utils.CacheKeyUtils).generateKey('good_app_page', #pageNum, #pageSize, #appQueryRequest.priority)")
+    public Page<App> listGoodAppPage(long pageNum, long pageSize, AppQueryRequest appQueryRequest) {
+        QueryWrapper queryWrapper = getQueryWrapper(appQueryRequest);
+        return page(Page.of(pageNum, pageSize), queryWrapper);
     }
 
     @PreDestroy
