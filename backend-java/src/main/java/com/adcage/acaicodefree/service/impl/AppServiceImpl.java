@@ -33,6 +33,10 @@ import com.adcage.acaicodefree.model.vo.chat.ChatHistoryVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatSessionVO;
 import com.adcage.acaicodefree.model.vo.chat.ToolEventVO;
 import com.adcage.acaicodefree.model.vo.user.UserVO;
+import com.adcage.acaicodefree.runtime.CodeGenerationRequest;
+import com.adcage.acaicodefree.runtime.CodeGenerationRuntime;
+import com.adcage.acaicodefree.runtime.CodeGenerationRuntimeRouter;
+import com.adcage.acaicodefree.service.AgentRunService;
 import com.mybatisflex.core.paginate.Page;
 import com.adcage.acaicodefree.service.UserService;
 import com.adcage.acaicodefree.service.ScreenshotService;
@@ -117,6 +121,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private ScreenshotProperties screenshotProperties;
+
+    @Resource
+    private CodeGenerationRuntimeRouter codeGenerationRuntimeRouter;
+
+    @Resource
+    private AgentRunService agentRunService;
 
     @Value("${server.port:8700}")
     private String serverPort;
@@ -271,14 +281,28 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         }
-        if (workflowProperties.useWorkflow()) {
-            return handleWorkflowChat(appId, sessionId, message, loginUser, app, codeGenTypeStr);
-        }
-        // 6. 调用 AI 生成代码并在流完成后落库 AI 消息
+        // 6. 通过 Runtime Router 选择运行时
+        CodeGenerationRuntime runtime = codeGenerationRuntimeRouter.select();
+        Long agentRunId = agentRunService.createAgentRun(appId, sessionId, loginUser.getId(), runtime.getName());
+        CodeGenerationRequest runtimeRequest = CodeGenerationRequest.builder()
+                .agentRunId(agentRunId)
+                .appId(appId)
+                .sessionId(sessionId)
+                .message(message)
+                .app(app)
+                .loginUser(loginUser)
+                .codeGenTypeEnum(codeGenTypeEnum)
+                .build();
+        // 7. 获取源流并根据运行时类型决定是否需要流处理器
         StringBuilder readableAssistantMessageBuilder = new StringBuilder();
         long startTime = System.currentTimeMillis();
-        Flux<String> sourceStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
-        Flux<String> handledStream = streamHandlerExecutor.handle(codeGenTypeEnum, sourceStream, readableAssistantMessageBuilder);
+        Flux<String> sourceStream = runtime.stream(runtimeRequest);
+        Flux<String> handledStream;
+        if ("java-legacy".equals(runtime.getName())) {
+            handledStream = streamHandlerExecutor.handle(codeGenTypeEnum, sourceStream, readableAssistantMessageBuilder);
+        } else {
+            handledStream = sourceStream.doOnNext(chunk -> readableAssistantMessageBuilder.append(chunk).append('\n'));
+        }
         return handledStream
                 .doOnComplete(() -> {
                     int latencyMs = (int) (System.currentTimeMillis() - startTime);
@@ -311,32 +335,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                     extraInfo.put("error", error.getMessage());
                     extraInfo.put("errorType", error.getClass().getSimpleName());
                     log.error("代码生成流程异常, appId={}, sessionId={}, codeGenType={}, userId={}, message={}",
-                            appId, sessionId, codeGenTypeStr, loginUser.getId(), message, error);
-                    String aiMessage = StrUtil.isBlank(readableAssistantMessageBuilder.toString())
-                            ? "生成失败：" + error.getMessage()
-                            : readableAssistantMessageBuilder.toString();
-                    saveHistoryMessage(sessionId, appId, loginUser.getId(), aiMessage, "ai", "failed", codeGenTypeStr, latencyMs, JSONUtil.toJsonStr(extraInfo));
-                    updateSessionSummary(sessionId);
-                });
-    }
-
-    private Flux<String> handleWorkflowChat(Long appId, Long sessionId, String message, User loginUser, App app, String codeGenTypeStr) {
-        StringBuilder readableAssistantMessageBuilder = new StringBuilder();
-        long startTime = System.currentTimeMillis();
-        return workflowCodeGeneratorService.executeWorkflowWithFlux(appId, message)
-                .doOnNext(chunk -> readableAssistantMessageBuilder.append(chunk).append('\n'))
-                .doOnComplete(() -> {
-                    int latencyMs = (int) (System.currentTimeMillis() - startTime);
-                    String aiMessage = readableAssistantMessageBuilder.toString();
-                    saveHistoryMessage(sessionId, appId, loginUser.getId(), aiMessage, "ai", "success", codeGenTypeStr, latencyMs, null);
-                    updateSessionSummary(sessionId);
-                })
-                .doOnError(error -> {
-                    int latencyMs = (int) (System.currentTimeMillis() - startTime);
-                    Map<String, String> extraInfo = new HashMap<>();
-                    extraInfo.put("error", error.getMessage());
-                    extraInfo.put("errorType", error.getClass().getSimpleName());
-                    log.error("工作流代码生成流程异常, appId={}, sessionId={}, codeGenType={}, userId={}, message={}",
                             appId, sessionId, codeGenTypeStr, loginUser.getId(), message, error);
                     String aiMessage = StrUtil.isBlank(readableAssistantMessageBuilder.toString())
                             ? "生成失败：" + error.getMessage()
