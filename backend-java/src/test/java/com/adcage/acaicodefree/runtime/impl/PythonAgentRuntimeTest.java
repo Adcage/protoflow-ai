@@ -70,7 +70,7 @@ class PythonAgentRuntimeTest {
                 .message("build app")
                 .modelConfigId(10L)
                 .configVersion(3)
-                .workspacePath("../storage/agent-workspaces/9/source")
+                .workspacePath("/custom/workspace/source")
                 .build();
 
         StepVerifier.create(runtime.stream(request))
@@ -83,6 +83,6 @@ class PythonAgentRuntimeTest {
         JsonNode body = Assertions.assertDoesNotThrow(() -> mapper.readTree(capturedRequestBody));
         Assertions.assertEquals(10, body.get("modelConfigId").asInt());
         Assertions.assertEquals(3, body.get("configVersion").asInt());
-        Assertions.assertEquals("../storage/agent-workspaces/9/source", body.get("workspacePath").asText());
+        Assertions.assertEquals("/custom/workspace/source", body.get("workspacePath").asText());
     }
 }

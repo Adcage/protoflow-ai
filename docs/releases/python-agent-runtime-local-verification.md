@@ -21,6 +21,10 @@
 - Workspace file:
 - Chat history:
 
+## Known Gaps
+
+- `modelConfigId` 和 `configVersion` 在 `AppServiceImpl` 构建 `CodeGenerationRequest` 时未填充。`app` 表无此列，`AgentRun` 实体有此字段但 `createAgentRun` 未接受这些参数。待后续从默认模型配置或前端请求参数补充。
+
 ## Issues
 
 - None
