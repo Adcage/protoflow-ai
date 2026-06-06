@@ -152,6 +152,11 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Spring Boot DevTools: 开发阶段使用的工具集，提供热部署和自动重启功能，提高开发效率 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
