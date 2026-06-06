@@ -53,7 +53,6 @@ agent-runtime-python/.mypy_cache/
 # Docs - only track specific subdirectories
 docs/*
 !docs/images/
-!docs/superpowers/
 !docs/releases/
 
 # Generated local docs artifacts
