@@ -12,6 +12,7 @@ import com.adcage.acaicodefree.mapper.AppMapper;
 import com.adcage.acaicodefree.mapper.ChatHistoryMapper;
 import com.adcage.acaicodefree.mapper.ChatSessionMapper;
 import com.adcage.acaicodefree.mapper.UserMapper;
+import com.adcage.acaicodefree.service.AgentRunService;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
@@ -40,8 +41,7 @@ import java.util.zip.ZipEntry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.mockito.Mockito.when;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -75,6 +75,9 @@ class AppChatE2ETest {
     @MockBean
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
 
+    @MockBean
+    private AgentRunService agentRunService;
+
     private User loginUser;
 
     private App testApp;
@@ -82,6 +85,7 @@ class AppChatE2ETest {
     @BeforeEach
     void setUp() {
         ensureChatSchema();
+        when(agentRunService.createAgentRun(anyLong(), anyLong(), anyLong(), anyString())).thenReturn(999L);
         String suffix = String.valueOf(System.nanoTime());
         User user = User.builder()
                 .userAccount("e2e_user_" + suffix)

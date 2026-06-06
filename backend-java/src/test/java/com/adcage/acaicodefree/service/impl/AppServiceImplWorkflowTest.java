@@ -11,6 +11,8 @@ import com.adcage.acaicodefree.model.entity.App;
 import com.adcage.acaicodefree.model.entity.ChatSession;
 import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
+import com.adcage.acaicodefree.runtime.CodeGenerationRuntimeRouter;
+import com.adcage.acaicodefree.service.AgentRunService;
 import com.adcage.acaicodefree.workflow.config.WorkflowProperties;
 import com.adcage.acaicodefree.workflow.service.WorkflowCodeGeneratorService;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -18,10 +20,10 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
@@ -59,6 +61,9 @@ class AppServiceImplWorkflowTest {
     @Resource
     private JdbcTemplate jdbcTemplate;
 
+    @Resource
+    private CodeGenerationRuntimeRouter codeGenerationRuntimeRouter;
+
     @MockBean
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
 
@@ -67,6 +72,9 @@ class AppServiceImplWorkflowTest {
 
     @MockBean
     private StreamHandlerExecutor streamHandlerExecutor;
+
+    @MockBean
+    private AgentRunService agentRunService;
 
     private User loginUser;
     private App testApp;
@@ -77,6 +85,8 @@ class AppServiceImplWorkflowTest {
         ensureChatSchema();
         workflowProperties.setEnabled(false);
         workflowProperties.setMode("legacy");
+        ReflectionTestUtils.setField(codeGenerationRuntimeRouter, "runtimeName", "java-legacy");
+        when(agentRunService.createAgentRun(anyLong(), anyLong(), anyLong(), anyString())).thenReturn(999L);
 
         String suffix = String.valueOf(System.nanoTime());
         loginUser = User.builder()
@@ -129,8 +139,7 @@ class AppServiceImplWorkflowTest {
 
     @Test
     void chatToGenCodeWhenWorkflowEnabledShouldUseWorkflowService() {
-        workflowProperties.setEnabled(true);
-        workflowProperties.setMode("workflow");
+        ReflectionTestUtils.setField(codeGenerationRuntimeRouter, "runtimeName", "java-workflow");
         when(workflowCodeGeneratorService.executeWorkflowWithFlux(anyLong(), anyString()))
                 .thenReturn(Flux.just("workflow_start", "workflow_completed"));
 
@@ -145,8 +154,7 @@ class AppServiceImplWorkflowTest {
 
     @Test
     void chatToGenCodeWhenWorkflowDisabledShouldUseLegacyFacade() {
-        workflowProperties.setEnabled(false);
-        workflowProperties.setMode("legacy");
+        ReflectionTestUtils.setField(codeGenerationRuntimeRouter, "runtimeName", "java-legacy");
         Flux<String> sourceFlux = Flux.just("legacy_chunk");
         when(aiCodeGeneratorFacade.generateAndSaveCodeStream(anyString(), any(), anyLong())).thenReturn(sourceFlux);
         when(streamHandlerExecutor.handle(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
