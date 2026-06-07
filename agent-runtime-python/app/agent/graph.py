@@ -32,7 +32,7 @@ async def invoke_model(state: AgentState) -> AgentState:
     if chat_model is None:
         events.append(AgentEvent(
             agentRunId=request.agentRunId, seq=seq, eventType="ai_response",
-            data={"content": _FALLBACK_CONTENT, "fallback": True},
+            data={"text": "已生成 Vue 页面源码（降级模板），准备写入 src/App.vue", "fallback": True},
         ))
         return {
             "request": request, "events": events,
@@ -60,7 +60,7 @@ async def invoke_model(state: AgentState) -> AgentState:
 
     events.append(AgentEvent(
         agentRunId=request.agentRunId, seq=seq, eventType="ai_response",
-        data={"content": content},
+        data={"text": "已生成 Vue 页面源码，准备写入 src/App.vue"},
     ))
 
     return {

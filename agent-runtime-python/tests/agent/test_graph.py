@@ -40,6 +40,9 @@ async def test_graph_writes_app_vue_with_fake_model(tmp_path: Path):
 
     event_types = [e.eventType for e in result["events"]]
     assert "ai_response" in event_types
+    ai_events = [e for e in result["events"] if e.eventType == "ai_response"]
+    assert ai_events
+    assert "text" in ai_events[0].data
     ai_response_idx = event_types.index("ai_response")
     tool_request_idx = event_types.index("tool_request")
     assert ai_response_idx < tool_request_idx
@@ -69,4 +72,7 @@ async def test_graph_fallback_without_model(tmp_path: Path):
     assert (tmp_path / "src" / "App.vue").exists()
     event_types = [e.eventType for e in result["events"]]
     assert "ai_response" in event_types
+    ai_events = [e for e in result["events"] if e.eventType == "ai_response"]
+    assert ai_events
+    assert "text" in ai_events[0].data
     assert "tool_request" in event_types
