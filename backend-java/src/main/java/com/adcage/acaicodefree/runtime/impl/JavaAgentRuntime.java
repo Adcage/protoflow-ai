@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 @Component
-public class JavaWorkflowRuntime implements CodeGenerationRuntime {
+public class JavaAgentRuntime implements CodeGenerationRuntime {
 
-    private static final String NAME = "java-workflow";
+    private static final String NAME = "java-agent";
 
     @Resource
     private WorkflowCodeGeneratorService workflowCodeGeneratorService;

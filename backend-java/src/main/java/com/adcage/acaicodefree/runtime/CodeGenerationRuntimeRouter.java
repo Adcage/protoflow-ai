@@ -14,7 +14,7 @@ public class CodeGenerationRuntimeRouter {
     @Resource
     private List<CodeGenerationRuntime> runtimes;
 
-    @Value("${agent.runtime:java-legacy}")
+    @Value("${agent.runtime:java-agent}")
     private String runtimeName;
 
     public CodeGenerationRuntime select() {

@@ -9,6 +9,9 @@ spring:
       database: ${REDIS_DB:0}
       password: ${REDIS_PASSWORD:123456}
       timeout: 3s
+  session:
+    store-type: redis
+    timeout: 1d
   # mysql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -145,7 +148,7 @@ dashscope:
   image-model: ${DASHSCOPE_IMAGE_MODEL:wanx2.2-t2i-flash}
 
 agent:
-  runtime: ${AGENT_RUNTIME:java-legacy}
+  runtime: ${AGENT_RUNTIME:java-agent}
   python:
     base-url: ${AGENT_PYTHON_BASE_URL:http://localhost:9000}
   runtime-internal-secret: ${AGENT_RUNTIME_INTERNAL_SECRET:}
