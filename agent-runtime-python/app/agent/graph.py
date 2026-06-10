@@ -38,6 +38,8 @@ async def invoke_model(state: AgentState) -> AgentState:
             "request": request, "events": events,
             "model_config": state.get("model_config"), "chat_model": None,
             "generated_content": _FALLBACK_CONTENT, "error": None,
+            "grpc_tool_client": state.get("grpc_tool_client"),
+            "grpc_platform_client": state.get("grpc_platform_client"),
         }
 
     system_prompt = prompt_builder.build_vue_app_prompt(request.prompt)
@@ -56,6 +58,8 @@ async def invoke_model(state: AgentState) -> AgentState:
             "request": request, "events": events,
             "model_config": state.get("model_config"), "chat_model": chat_model,
             "generated_content": None, "error": "模型返回内容为空",
+            "grpc_tool_client": state.get("grpc_tool_client"),
+            "grpc_platform_client": state.get("grpc_platform_client"),
         }
 
     events.append(AgentEvent(
@@ -67,6 +71,8 @@ async def invoke_model(state: AgentState) -> AgentState:
         "request": request, "events": events,
         "model_config": state.get("model_config"), "chat_model": chat_model,
         "generated_content": content, "error": None,
+        "grpc_tool_client": state.get("grpc_tool_client"),
+        "grpc_platform_client": state.get("grpc_platform_client"),
     }
 
 
@@ -75,6 +81,7 @@ async def write_file(state: AgentState) -> AgentState:
     events = list(state["events"])
     seq = len(events) + 1
     generated_content = state.get("generated_content")
+    tool_client = state.get("grpc_tool_client")
 
     if generated_content is None:
         events.append(AgentEvent(
@@ -85,10 +92,9 @@ async def write_file(state: AgentState) -> AgentState:
             "request": request, "events": events,
             "model_config": state.get("model_config"), "chat_model": state.get("chat_model"),
             "generated_content": None, "error": state.get("error") or "无生成内容",
+            "grpc_tool_client": tool_client, "grpc_platform_client": state.get("grpc_platform_client"),
         }
 
-    workspace = Workspace(request.workspacePath or f"storage/agent-workspaces/{request.agentRunId}/source")
-    tools = FileTools(workspace)
     path = "src/App.vue"
 
     events.append(AgentEvent(
@@ -97,7 +103,13 @@ async def write_file(state: AgentState) -> AgentState:
     ))
     seq += 1
 
-    result = tools.write_file(path, generated_content)
+    if tool_client:
+        result = await tool_client.write_file(path, generated_content)
+    else:
+        workspace = Workspace(request.workspacePath or f"storage/agent-workspaces/{request.agentRunId}/source")
+        tools = FileTools(workspace)
+        result = tools.write_file(path, generated_content)
+
     events.append(AgentEvent(
         agentRunId=request.agentRunId, seq=seq, eventType="tool_executed",
         data={"id": "tool-1", "name": "write_file", "arguments": {"path": path}, "result": result},
@@ -109,6 +121,7 @@ async def write_file(state: AgentState) -> AgentState:
         "request": request, "events": events,
         "model_config": state.get("model_config"), "chat_model": state.get("chat_model"),
         "generated_content": generated_content, "error": None,
+        "grpc_tool_client": tool_client, "grpc_platform_client": state.get("grpc_platform_client"),
     }
 
 
