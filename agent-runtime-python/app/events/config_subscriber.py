@@ -45,6 +45,8 @@ def _handle_message(message: dict) -> None:
         logger.exception("处理模型配置事件失败")
 
 
+# NOTE: This subscriber is currently not enabled (no caller in production).
+# Retained for potential future use when Redis pub/sub is deployed.
 def start_subscriber(redis_url: str | None = None) -> None:
     url = redis_url or settings.redis_url
     if not url:

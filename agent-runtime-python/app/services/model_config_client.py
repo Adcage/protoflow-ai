@@ -4,6 +4,8 @@ from app.core.exceptions import AgentRuntimeError
 
 
 class ModelConfigClient:
+    """DEPRECATED: Use GrpcPlatformClient instead. This HTTP-based client will be removed in a future version."""
+
     def __init__(
         self,
         java_platform_base_url: str,

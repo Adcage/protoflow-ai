@@ -30,6 +30,8 @@ async def event_stream(request: CodeGenerationRequest, request_id: str) -> Async
     logger.info("agent_run_id=%s request_id=%s stream completed", request.agentRunId, request_id)
 
 
+# NOTE: gRPC CodeGenerationService (port 9091) is the primary channel for code generation.
+# This HTTP SSE endpoint is retained as a fallback/degradation path only.
 @router.post("/stream")
 async def stream_code_generation(request: CodeGenerationRequest, http_request: Request) -> StreamingResponse:
     request_id = getattr(http_request.state, "request_id", "unknown")

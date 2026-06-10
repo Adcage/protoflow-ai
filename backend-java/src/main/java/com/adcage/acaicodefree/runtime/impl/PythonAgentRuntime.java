@@ -1,11 +1,13 @@
 package com.adcage.acaicodefree.runtime.impl;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
+import com.adcage.acaicodefree.ai.model.message.AiResponseMessage;
+import com.adcage.acaicodefree.ai.model.message.ToolExecutedMessage;
+import com.adcage.acaicodefree.ai.model.message.ToolRequestMessage;
 import com.adcage.acaicodefree.config.properties.WorkspaceProperties;
 import com.adcage.acaicodefree.runtime.CodeGenerationRequest;
 import com.adcage.acaicodefree.runtime.CodeGenerationRuntime;
-import com.adcage.acaicodefree.runtime.PythonAgentEvent;
-import com.adcage.acaicodefree.runtime.PythonAgentEventMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -32,9 +34,6 @@ public class PythonAgentRuntime implements CodeGenerationRuntime {
 
     @Resource
     private WorkspaceProperties workspaceProperties;
-
-    @Resource
-    private PythonAgentEventMapper pythonAgentEventMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -66,8 +65,15 @@ public class PythonAgentRuntime implements CodeGenerationRuntime {
                             .filter(line -> !line.isBlank())
                             .forEach(line -> {
                                 try {
-                                    PythonAgentEvent event = objectMapper.readValue(line, PythonAgentEvent.class);
-                                    sink.next(pythonAgentEventMapper.mapToStreamMessage(event));
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> event = objectMapper.readValue(line, Map.class);
+                                    String eventType = String.valueOf(event.get("eventType"));
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> data = (Map<String, Object>) event.get("data");
+                                    String mapped = mapLegacyEventToStreamMessage(eventType, data);
+                                    if (mapped != null) {
+                                        sink.next(mapped);
+                                    }
                                 } catch (Exception e) {
                                     log.warn("解析 Python Agent 事件失败: {}", e.getMessage());
                                 }
@@ -108,5 +114,29 @@ public class PythonAgentRuntime implements CodeGenerationRuntime {
             return workspaceProperties.getAgentWorkspaceDir() + "/unknown/source";
         }
         return workspaceProperties.getAgentWorkspaceDir() + "/" + agentRunId + "/source";
+    }
+
+    private String mapLegacyEventToStreamMessage(String eventType, Map<String, Object> data) {
+        return switch (eventType) {
+            case "ai_response" -> {
+                Object text = data.get("text");
+                if (text == null) text = data.getOrDefault("content", "");
+                yield JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(text)));
+            }
+            case "tool_request" -> JSONUtil.toJsonStr(new ToolRequestMessage(
+                    String.valueOf(data.getOrDefault("id", "unknown")),
+                    String.valueOf(data.getOrDefault("name", "unknown")),
+                    String.valueOf(data.getOrDefault("arguments", "{}"))
+            ));
+            case "tool_executed" -> JSONUtil.toJsonStr(new ToolExecutedMessage(
+                    String.valueOf(data.getOrDefault("id", "unknown")),
+                    String.valueOf(data.getOrDefault("name", "unknown")),
+                    String.valueOf(data.getOrDefault("arguments", "{}")),
+                    String.valueOf(data.getOrDefault("result", ""))
+            ));
+            case "error" -> JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + data.getOrDefault("message", "")));
+            case "done" -> JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(data.getOrDefault("message", ""))));
+            default -> JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(data)));
+        };
     }
 }
