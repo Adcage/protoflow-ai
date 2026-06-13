@@ -15,6 +15,7 @@ import com.adcage.acaicodefree.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.adcage.acaicodefree.config.properties.ScreenshotProperties;
 import com.adcage.acaicodefree.config.properties.WorkspaceProperties;
 import com.adcage.acaicodefree.constant.AppConstant;
+import com.adcage.acaicodefree.constant.UserConstant;
 import com.adcage.acaicodefree.core.AiCodeGeneratorFacade;
 import com.adcage.acaicodefree.core.build.VueProjectBuildService;
 import com.adcage.acaicodefree.core.handler.StreamHandlerExecutor;
@@ -155,6 +156,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));//TODO 后续优化成AI生成应用名称
         app.setInitPrompt(initPrompt);
         app.setCodeGenType(codeGenTypeEnum.getValue());
+        app.setStyleTemplate(appAddRequest.getStyleTemplate());
         app.setUserId(loginUser.getId());
         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
         boolean saveResult = this.save(app);
@@ -475,6 +477,33 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         Page<ChatHistoryVO> resultPage = new Page<>(pageNum, pageSize, allHistoryList.size());
         resultPage.setRecords(records);
         return resultPage;
+    }
+
+    @Override
+    public void renameChatSession(Long sessionId, String title, User loginUser) {
+        ThrowUtils.throwIf(sessionId == null || sessionId <= 0, ErrorCode.PARAMS_ERROR, "会话 ID 无效");
+        ThrowUtils.throwIf(StrUtil.isBlank(title), ErrorCode.PARAMS_ERROR, "会话标题不能为空");
+        ThrowUtils.throwIf(title.length() > 200, ErrorCode.PARAMS_ERROR, "会话标题过长");
+        ChatSession chatSession = chatSessionMapper.selectOneById(sessionId);
+        ThrowUtils.throwIf(chatSession == null, ErrorCode.NOT_FOUND_ERROR, "会话不存在");
+        if (!chatSession.getUserId().equals(loginUser.getId()) && !UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作该会话");
+        }
+        chatSession.setTitle(title);
+        int updateResult = chatSessionMapper.update(chatSession);
+        ThrowUtils.throwIf(updateResult <= 0, ErrorCode.OPERATION_ERROR, "重命名会话失败");
+    }
+
+    @Override
+    public void deleteChatSession(Long sessionId, User loginUser) {
+        ThrowUtils.throwIf(sessionId == null || sessionId <= 0, ErrorCode.PARAMS_ERROR, "会话 ID 无效");
+        ChatSession chatSession = chatSessionMapper.selectOneById(sessionId);
+        ThrowUtils.throwIf(chatSession == null, ErrorCode.NOT_FOUND_ERROR, "会话不存在");
+        if (!chatSession.getUserId().equals(loginUser.getId()) && !UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作该会话");
+        }
+        int deleteResult = chatSessionMapper.deleteById(sessionId);
+        ThrowUtils.throwIf(deleteResult <= 0, ErrorCode.OPERATION_ERROR, "删除会话失败");
     }
 
     @Override

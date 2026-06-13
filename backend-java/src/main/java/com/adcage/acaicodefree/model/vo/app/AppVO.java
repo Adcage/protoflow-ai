@@ -40,6 +40,11 @@ public class AppVO implements Serializable {
     private String codeGenType;
 
     /**
+     * 风格模板
+     */
+    private String styleTemplate;
+
+    /**
      * 部署标识
      */
     private String deployKey;

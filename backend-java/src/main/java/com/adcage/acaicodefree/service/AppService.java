@@ -102,6 +102,23 @@ public interface AppService extends IService<App> {
     Page<ChatHistoryVO> listChatHistoryByPage(ChatHistoryQueryRequest chatHistoryQueryRequest, User loginUser);
 
     /**
+     * 重命名会话
+     *
+     * @param sessionId 会话 ID
+     * @param title     新标题
+     * @param loginUser 当前登录用户
+     */
+    void renameChatSession(Long sessionId, String title, User loginUser);
+
+    /**
+     * 删除会话
+     *
+     * @param sessionId 会话 ID
+     * @param loginUser 当前登录用户
+     */
+    void deleteChatSession(Long sessionId, User loginUser);
+
+    /**
      * 部署应用
      *
      * @param appId     应用 ID

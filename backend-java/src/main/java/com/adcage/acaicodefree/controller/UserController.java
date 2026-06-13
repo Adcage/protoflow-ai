@@ -12,6 +12,7 @@ import com.adcage.acaicodefree.exception.ThrowUtils;
 import com.adcage.acaicodefree.model.dto.user.*;
 import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.vo.user.LoginUserVO;
+import com.adcage.acaicodefree.model.vo.user.UsageStatsVO;
 import com.adcage.acaicodefree.model.vo.user.UserVO;
 import com.adcage.acaicodefree.service.UserService;
 import com.mybatisflex.core.paginate.Page;
@@ -247,6 +248,13 @@ public class UserController {
         Page<User> userPage = userService.page(Page.of(pageNum, pageSize),
                 userService.getQueryWrapper(userQueryRequest));
         return ResultUtils.success(userPage);
+    }
+
+    @GetMapping("/usage/stats")
+    public BaseResponse<UsageStatsVO> getUsageStats(HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        UsageStatsVO usageStats = userService.getUsageStats(loginUser.getId());
+        return ResultUtils.success(usageStats);
     }
 
 }

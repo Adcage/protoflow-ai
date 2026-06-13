@@ -145,6 +145,26 @@ public class ModelConfigController {
         return ResultUtils.success(modelConfigVOPage);
     }
 
+    @PostMapping("/toggle/enabled")
+    public BaseResponse<Boolean> toggleEnabled(@RequestBody DeleteRequest toggleRequest, HttpServletRequest request) {
+        if (toggleRequest == null || toggleRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        modelConfigService.toggleEnabled(toggleRequest.getId(), loginUser);
+        return ResultUtils.success(true);
+    }
+
+    @PostMapping("/set/default")
+    public BaseResponse<Boolean> setDefault(@RequestBody DeleteRequest setDefaultRequest, HttpServletRequest request) {
+        if (setDefaultRequest == null || setDefaultRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        modelConfigService.setDefault(setDefaultRequest.getId(), loginUser);
+        return ResultUtils.success(true);
+    }
+
     @GetMapping("/internal/runtime")
     public BaseResponse<ModelConfigRuntimeVO> getRuntimeConfig(@RequestParam Long id,
                                                                 @RequestParam Integer configVersion,

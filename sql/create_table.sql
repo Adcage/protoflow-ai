@@ -35,8 +35,9 @@ CREATE TABLE app
     appName      VARCHAR(256)                       NULL COMMENT '应用名称',
     cover        VARCHAR(512)                       NULL COMMENT '应用封面',
     initPrompt   TEXT                               NULL COMMENT '应用初始化的 prompt',
-    codeGenType  VARCHAR(64)                        NULL COMMENT '代码生成类型（枚举）',
-    deployKey    VARCHAR(64)                        NULL COMMENT '部署标识',
+    codeGenType   VARCHAR(64)                        NULL COMMENT '代码生成类型（枚举）',
+    styleTemplate VARCHAR(64)                        NULL COMMENT '风格模板',
+    deployKey     VARCHAR(64)                        NULL COMMENT '部署标识',
     deployedTime DATETIME                           NULL COMMENT '部署时间',
     -- 99为精选应用，用于主页展示高质量的应用，使用整型而不是用枚举利于拓展
     priority     INT      DEFAULT 0                 NOT NULL COMMENT '优先级',

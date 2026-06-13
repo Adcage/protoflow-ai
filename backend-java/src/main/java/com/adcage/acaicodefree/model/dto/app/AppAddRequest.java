@@ -22,5 +22,10 @@ public class AppAddRequest implements Serializable {
      */
     private String codeGenType;
 
+    /**
+     * 风格模板
+     */
+    private String styleTemplate;
+
     private static final long serialVersionUID = 1L;
 }

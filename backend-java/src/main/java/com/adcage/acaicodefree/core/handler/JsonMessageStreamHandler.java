@@ -47,7 +47,7 @@ public class JsonMessageStreamHandler {
                 JSONObject arguments = parseArguments(jsonObject.getStr("arguments", ""));
                 String requestText = buildToolRequestText(toolName, arguments);
                 if (StrUtil.isNotBlank(requestText)) {
-                    readableOutput.append("\n[工具调用] ").append(requestText);
+                    readableOutput.append("\n[工具调用] ").append(requestText).append('\n');
                 }
                 return Flux.just(chunk);
             }
@@ -57,7 +57,7 @@ public class JsonMessageStreamHandler {
                 JSONObject arguments = parseArguments(jsonObject.getStr("arguments", ""));
                 String executedText = buildToolExecutedText(toolName, arguments, result);
                 if (StrUtil.isNotBlank(executedText)) {
-                    readableOutput.append("\n[工具完成] ").append(executedText);
+                    readableOutput.append("\n[工具完成] ").append(executedText).append('\n');
                 }
                 return Flux.just(chunk);
             }

@@ -158,5 +158,5 @@ grpc:
     port: 9090
   client:
     python-agent:
-      address: 'static://localhost:9091'
+      address: 'dns:///localhost:9091'
       negotiationType: plaintext

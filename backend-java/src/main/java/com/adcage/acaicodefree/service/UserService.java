@@ -2,6 +2,7 @@ package com.adcage.acaicodefree.service;
 
 import com.adcage.acaicodefree.model.dto.user.UserQueryRequest;
 import com.adcage.acaicodefree.model.vo.user.LoginUserVO;
+import com.adcage.acaicodefree.model.vo.user.UsageStatsVO;
 import com.adcage.acaicodefree.model.vo.user.UserVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
@@ -74,4 +75,6 @@ public interface UserService extends IService<User> {
     List<UserVO> getUserVOList(List<User> userList);
 
     QueryWrapper getQueryWrapper(UserQueryRequest userQueryRequest);
+
+    UsageStatsVO getUsageStats(Long userId);
 }

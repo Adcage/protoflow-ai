@@ -6,21 +6,29 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.StrUtil;
 import com.adcage.acaicodefree.common.ErrorCode;
 import com.adcage.acaicodefree.exception.BusinessException;
+import com.adcage.acaicodefree.mapper.AppMapper;
+import com.adcage.acaicodefree.mapper.ChatHistoryMapper;
+import com.adcage.acaicodefree.mapper.ChatSessionMapper;
 import com.adcage.acaicodefree.mapper.UserMapper;
 import com.adcage.acaicodefree.model.dto.user.UserQueryRequest;
 import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.enums.UserRoleEnum;
+import com.adcage.acaicodefree.model.vo.user.DailyUsageVO;
 import com.adcage.acaicodefree.model.vo.user.LoginUserVO;
+import com.adcage.acaicodefree.model.vo.user.UsageStatsVO;
 import com.adcage.acaicodefree.model.vo.user.UserVO;
 import com.adcage.acaicodefree.service.UserService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.adcage.acaicodefree.constant.UserConstant.USER_LOGIN_STATE;
@@ -32,6 +40,15 @@ import static com.adcage.acaicodefree.constant.UserConstant.USER_LOGIN_STATE;
  */
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Resource
+    private ChatHistoryMapper chatHistoryMapper;
+
+    @Resource
+    private AppMapper appMapper;
+
+    @Resource
+    private ChatSessionMapper chatSessionMapper;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -195,6 +212,49 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .like("userName", userName)
                 .like("userProfile", userProfile)
                 .orderBy(sortField, "ascend".equals(sortOrder));
+    }
+
+    @Override
+    public UsageStatsVO getUsageStats(Long userId) {
+        UsageStatsVO statsVO = new UsageStatsVO();
+
+        Map<String, Object> usageMap = chatHistoryMapper.selectUsageStatsByUserId(userId);
+        if (usageMap != null) {
+            statsVO.setTotalInputTokens(toLong(usageMap.get("totalInputTokens")));
+            statsVO.setTotalOutputTokens(toLong(usageMap.get("totalOutputTokens")));
+            statsVO.setTotalMessages(toLong(usageMap.get("totalMessages")));
+            statsVO.setAvgLatencyMs(toDouble(usageMap.get("avgLatencyMs")));
+        } else {
+            statsVO.setTotalInputTokens(0L);
+            statsVO.setTotalOutputTokens(0L);
+            statsVO.setTotalMessages(0L);
+            statsVO.setAvgLatencyMs(0.0);
+        }
+
+        long appCount = appMapper.selectCountByQuery(QueryWrapper.create().eq("userId", userId));
+        statsVO.setTotalApps((int) appCount);
+
+        long sessionCount = chatSessionMapper.selectCountByQuery(QueryWrapper.create().eq("userId", userId));
+        statsVO.setTotalSessions((int) sessionCount);
+
+        List<DailyUsageVO> dailyUsage = chatHistoryMapper.selectDailyUsageByUserId(userId);
+        statsVO.setRecentDailyUsage(dailyUsage != null ? dailyUsage : new ArrayList<>());
+
+        return statsVO;
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) return 0L;
+        if (value instanceof BigDecimal) return ((BigDecimal) value).longValue();
+        if (value instanceof Number) return ((Number) value).longValue();
+        return Long.parseLong(value.toString());
+    }
+
+    private Double toDouble(Object value) {
+        if (value == null) return 0.0;
+        if (value instanceof BigDecimal) return ((BigDecimal) value).doubleValue();
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        return Double.parseDouble(value.toString());
     }
 
 }

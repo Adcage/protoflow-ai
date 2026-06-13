@@ -60,6 +60,12 @@ public class App implements Serializable {
     private String codeGenType;
 
     /**
+     * 风格模板
+     */
+    @Column("styleTemplate")
+    private String styleTemplate;
+
+    /**
      * 部署标识
      */
     @Column("deployKey")

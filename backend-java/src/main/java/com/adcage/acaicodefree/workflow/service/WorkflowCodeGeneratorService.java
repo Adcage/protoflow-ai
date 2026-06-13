@@ -29,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.state.AgentState;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
@@ -94,24 +95,26 @@ public class WorkflowCodeGeneratorService {
 
     public Flux<WorkflowStreamEvent> executeWorkflowEventFlux(Long appId, String message) {
         return Flux.create(sink -> {
-            sink.next(new WorkflowStreamEvent("workflow_start", "{\"step\":\"start\",\"appId\":" + appId + "}"));
-            try {
-                WorkflowContext context = executeWorkflowWithEvents(appId, message, event -> {
-                    if (!sink.isCancelled()) {
-                        sink.next(event);
-                    }
-                });
-                String codeGenType = context.getGenerationType() == null ? "" : context.getGenerationType().getValue();
-                sink.next(new WorkflowStreamEvent("workflow_completed", "{\"step\":\"done\",\"codeGenType\":\""
-                        + codeGenType + "\",\"generatedCodeDir\":\""
-                        + context.getGeneratedCodeDir().replace("\\", "\\\\") + "\"}"));
-                sink.complete();
-            } catch (Exception e) {
-                log.error("[WorkflowCodeGeneratorService] workflow execution failed, appId={}", appId, e);
-                sink.next(new WorkflowStreamEvent("workflow_error", "{\"message\":\""
-                        + (e.getMessage() == null ? "unknown" : e.getMessage().replace("\"", "'")) + "\"}"));
-                sink.complete();
-            }
+            Schedulers.boundedElastic().schedule(() -> {
+                sink.next(new WorkflowStreamEvent("workflow_start", "{\"step\":\"start\",\"appId\":" + appId + "}"));
+                try {
+                    WorkflowContext context = executeWorkflowWithEvents(appId, message, event -> {
+                        if (!sink.isCancelled()) {
+                            sink.next(event);
+                        }
+                    });
+                    String codeGenType = context.getGenerationType() == null ? "" : context.getGenerationType().getValue();
+                    sink.next(new WorkflowStreamEvent("workflow_completed", "{\"step\":\"done\",\"codeGenType\":\""
+                            + codeGenType + "\",\"generatedCodeDir\":\""
+                            + context.getGeneratedCodeDir().replace("\\", "\\\\") + "\"}"));
+                    sink.complete();
+                } catch (Exception e) {
+                    log.error("[WorkflowCodeGeneratorService] workflow execution failed, appId={}", appId, e);
+                    sink.next(new WorkflowStreamEvent("workflow_error", "{\"message\":\""
+                            + (e.getMessage() == null ? "unknown" : e.getMessage().replace("\"", "'")) + "\"}"));
+                    sink.complete();
+                }
+            });
         });
     }
 

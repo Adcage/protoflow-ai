@@ -4,10 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.adcage.acaicodefree.common.ErrorCode;
+import com.adcage.acaicodefree.constant.UserConstant;
 import com.adcage.acaicodefree.exception.BusinessException;
 import com.adcage.acaicodefree.exception.ThrowUtils;
 import com.adcage.acaicodefree.mapper.ModelConfigMapper;
 import com.adcage.acaicodefree.model.entity.ModelConfig;
+import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.vo.modelconfig.ModelConfigVO;
 import com.adcage.acaicodefree.service.ModelConfigEventPublisher;
 import com.adcage.acaicodefree.service.ModelConfigService;
@@ -85,5 +87,47 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
                 .orderBy("updateTime", false)
                 .limit(1);
         return mapper.selectOneByQuery(fallbackQuery);
+    }
+
+    @Override
+    public void toggleEnabled(Long id, User loginUser) {
+        ModelConfig modelConfig = this.getById(id);
+        ThrowUtils.throwIf(modelConfig == null, ErrorCode.NOT_FOUND_ERROR, "模型配置不存在");
+        if (!modelConfig.getUserId().equals(loginUser.getId()) && !UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作该模型配置");
+        }
+        int newEnabled = modelConfig.getEnabled() == 1 ? 0 : 1;
+        ModelConfig update = new ModelConfig();
+        update.setId(id);
+        update.setEnabled(newEnabled);
+        if (newEnabled == 0 && Integer.valueOf(1).equals(modelConfig.getIsDefault())) {
+            update.setIsDefault(0);
+        }
+        boolean result = this.updateById(update);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "切换启用状态失败");
+    }
+
+    @Override
+    public void setDefault(Long id, User loginUser) {
+        ModelConfig modelConfig = this.getById(id);
+        ThrowUtils.throwIf(modelConfig == null, ErrorCode.NOT_FOUND_ERROR, "模型配置不存在");
+        if (!modelConfig.getUserId().equals(loginUser.getId()) && !UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作该模型配置");
+        }
+        QueryWrapper clearQuery = QueryWrapper.create()
+                .eq("userId", modelConfig.getUserId())
+                .eq("isDefault", 1);
+        List<ModelConfig> defaultConfigs = mapper.selectListByQuery(clearQuery);
+        for (ModelConfig dc : defaultConfigs) {
+            ModelConfig clearUpdate = new ModelConfig();
+            clearUpdate.setId(dc.getId());
+            clearUpdate.setIsDefault(0);
+            this.updateById(clearUpdate);
+        }
+        ModelConfig setUpdate = new ModelConfig();
+        setUpdate.setId(id);
+        setUpdate.setIsDefault(1);
+        boolean result = this.updateById(setUpdate);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "设置默认配置失败");
     }
 }
