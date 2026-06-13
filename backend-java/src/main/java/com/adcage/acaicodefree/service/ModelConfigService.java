@@ -19,6 +19,8 @@ public interface ModelConfigService extends IService<ModelConfig> {
 
     ModelConfig getDefaultEnabledModelConfig(Long userId);
 
+    ModelConfig getServerDefaultConfig();
+
     void toggleEnabled(Long id, User loginUser);
 
     void setDefault(Long id, User loginUser);

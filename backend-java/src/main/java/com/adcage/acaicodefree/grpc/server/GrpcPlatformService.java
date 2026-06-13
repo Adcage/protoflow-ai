@@ -41,7 +41,11 @@ public class GrpcPlatformService extends PlatformServiceGrpc.PlatformServiceImpl
     @Override
     public void getModelConfig(GetModelConfigRequest request, StreamObserver<GetModelConfigResponse> responseObserver) {
         try {
-            ModelConfig modelConfig = modelConfigService.getById(request.getModelConfigId());
+            long configId = request.getModelConfigId();
+            ModelConfig modelConfig = configId > 0 ? modelConfigService.getById(configId) : null;
+            if (modelConfig == null) {
+                modelConfig = modelConfigService.getServerDefaultConfig();
+            }
             if (modelConfig == null) {
                 responseObserver.onNext(GetModelConfigResponse.newBuilder()
                         .setProvider("")

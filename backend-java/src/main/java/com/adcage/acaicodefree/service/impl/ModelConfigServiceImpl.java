@@ -16,6 +16,7 @@ import com.adcage.acaicodefree.service.ModelConfigService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,6 +27,15 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
 
     @Resource
     private ModelConfigEventPublisher modelConfigEventPublisher;
+
+    @Value("${langchain4j.open-ai.chat-model.base-url:}")
+    private String defaultBaseUrl;
+
+    @Value("${langchain4j.open-ai.chat-model.api-key:}")
+    private String defaultApiKey;
+
+    @Value("${langchain4j.open-ai.chat-model.model-name:}")
+    private String defaultModelName;
 
     @Override
     public void validModelConfig(ModelConfig modelConfig, boolean add) {
@@ -86,7 +96,33 @@ public class ModelConfigServiceImpl extends ServiceImpl<ModelConfigMapper, Model
                 .eq("enabled", 1)
                 .orderBy("updateTime", false)
                 .limit(1);
-        return mapper.selectOneByQuery(fallbackQuery);
+        ModelConfig userConfig = mapper.selectOneByQuery(fallbackQuery);
+        if (userConfig != null) {
+            return userConfig;
+        }
+        return buildServerDefaultConfig();
+    }
+
+    private ModelConfig buildServerDefaultConfig() {
+        if (StrUtil.isBlank(defaultBaseUrl) || StrUtil.isBlank(defaultApiKey) || StrUtil.isBlank(defaultModelName)) {
+            return null;
+        }
+        return ModelConfig.builder()
+                .provider("openai")
+                .modelName(defaultModelName)
+                .baseUrl(defaultBaseUrl)
+                .apiKeyCipher(defaultApiKey)
+                .temperature(0.7)
+                .maxTokens(8192)
+                .configVersion(0)
+                .enabled(1)
+                .isDefault(1)
+                .build();
+    }
+
+    @Override
+    public ModelConfig getServerDefaultConfig() {
+        return buildServerDefaultConfig();
     }
 
     @Override
