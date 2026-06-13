@@ -1,77 +1,50 @@
 <template>
   <a-layout-footer class="global-footer">
     <div class="footer-content">
-      <p class="copyright">
-        AI Code Free by
-        <a
-          href="https://github.com/Adcage"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="github-link"
-        >
-          @Adcage
-        </a>
-      </p>
+      <span class="copyright">&copy; 2026 AC AI Code Free</span>
+      <a href="https://github.com/Adcage" target="_blank" rel="noopener noreferrer" class="github-link">
+        <ExternalLink :size="18" />
+      </a>
     </div>
   </a-layout-footer>
 </template>
 
 <script lang="ts" setup>
-// 无需额外的逻辑
+import { ExternalLink } from '@lucide/vue'
 </script>
 
 <style scoped>
 .global-footer {
-  background: #f0f2f5;
-  border-top: 1px solid #d9d9d9;
-  padding: 16px 0;
+  background: var(--color-background);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-md) 0;
   margin-top: auto;
 }
 
 .footer-content {
-  max-width: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 24px;
-  text-align: center;
+  padding: 0 var(--space-lg);
 }
 
 .copyright {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-  line-height: 1.5;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 
 .github-link {
-  color: #1890ff;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+  cursor: pointer;
 }
 
 .github-link:hover {
-  color: #40a9ff;
-  text-decoration: underline;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .footer-content {
-    padding: 0 16px;
-  }
-
-  .copyright {
-    font-size: 13px;
-  }
-}
-
-@media (max-width: 480px) {
-  .footer-content {
-    padding: 0 12px;
-  }
-
-  .copyright {
-    font-size: 12px;
-  }
+  color: var(--color-text);
 }
 </style>

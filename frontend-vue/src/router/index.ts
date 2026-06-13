@@ -20,7 +20,7 @@ Object.entries(modules).forEach(([key, value]) => {
 })
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: routeModules
+  routes: routeModules,
 })
 
 export default router

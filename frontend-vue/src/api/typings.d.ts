@@ -1,14 +1,15 @@
 declare namespace API {
   type App = {
-    id?: string
+    id?: number
     appName?: string
     cover?: string
     initPrompt?: string
     codeGenType?: string
+    styleTemplate?: string
     deployKey?: string
     deployedTime?: string
     priority?: number
-    userId?: string
+    userId?: number
     editTime?: string
     createTime?: string
     updateTime?: string
@@ -18,21 +19,22 @@ declare namespace API {
   type AppAddRequest = {
     initPrompt?: string
     codeGenType?: string
+    styleTemplate?: string
   }
 
   type AppAdminUpdateRequest = {
-    id?: string
+    id?: number
     appName?: string
     cover?: string
     priority?: number
   }
 
   type AppDeployRequest = {
-    appId?: string
+    appId?: number
   }
 
   type AppEditRequest = {
-    id?: string
+    id?: number
     appName?: string
   }
 
@@ -58,6 +60,7 @@ declare namespace API {
     cover?: string
     initPrompt?: string
     codeGenType?: string
+    styleTemplate?: string
     deployKey?: string
     deployedTime?: string
     priority?: number
@@ -88,6 +91,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseListChatSessionVO = {
+    code?: number
+    data?: ChatSessionVO[]
+    message?: string
+  }
+
   type BaseResponseLoginUserVO = {
     code?: number
     data?: LoginUserVO
@@ -100,15 +109,15 @@ declare namespace API {
     message?: string
   }
 
-  type BaseResponseListChatSessionVO = {
+  type BaseResponseModelConfigRuntimeVO = {
     code?: number
-    data?: ChatSessionVO[]
+    data?: ModelConfigRuntimeVO
     message?: string
   }
 
-  type BaseResponsePageChatHistoryVO = {
+  type BaseResponseModelConfigVO = {
     code?: number
-    data?: PageChatHistoryVO
+    data?: ModelConfigVO
     message?: string
   }
 
@@ -121,6 +130,18 @@ declare namespace API {
   type BaseResponsePageAppVO = {
     code?: number
     data?: PageAppVO
+    message?: string
+  }
+
+  type BaseResponsePageChatHistoryVO = {
+    code?: number
+    data?: PageChatHistoryVO
+    message?: string
+  }
+
+  type BaseResponsePageModelConfigVO = {
+    code?: number
+    data?: PageModelConfigVO
     message?: string
   }
 
@@ -142,6 +163,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseUsageStatsVO = {
+    code?: number
+    data?: UsageStatsVO
+    message?: string
+  }
+
   type BaseResponseUser = {
     code?: number
     data?: User
@@ -152,12 +179,6 @@ declare namespace API {
     code?: number
     data?: UserVO
     message?: string
-  }
-
-  type chatToGenCodeParams = {
-    appId: number
-    sessionId?: number
-    message: string
   }
 
   type ChatHistoryQueryRequest = {
@@ -188,13 +209,13 @@ declare namespace API {
     createTime?: string
   }
 
-  type ToolEventVO = {
-    type?: string
-    text?: string
-  }
-
   type ChatSessionCreateRequest = {
     appId?: number
+  }
+
+  type ChatSessionRenameRequest = {
+    sessionId?: number
+    title?: string
   }
 
   type ChatSessionVO = {
@@ -209,8 +230,30 @@ declare namespace API {
     updateTime?: string
   }
 
+  type chatToGenCodeParams = {
+    appId: number
+    sessionId?: number
+    message: string
+  }
+
+  type DailyUsageVO = {
+    date?: string
+    inputTokens?: number
+    outputTokens?: number
+    messages?: number
+  }
+
   type DeleteRequest = {
     id?: number
+  }
+
+  type downloadAppProjectParams = {
+    appId: number
+  }
+
+  type executeParams = {
+    appId: number
+    message: string
   }
 
   type getAppByIdParams = {
@@ -223,6 +266,15 @@ declare namespace API {
 
   type getAppVOByIdParams = {
     id: number
+  }
+
+  type getModelConfigVOByIdParams = {
+    id: number
+  }
+
+  type getRuntimeConfigParams = {
+    id: number
+    configVersion: number
   }
 
   type getUserByIdParams = {
@@ -248,6 +300,59 @@ declare namespace API {
     updateTime?: string
   }
 
+  type ModelConfigAddRequest = {
+    provider?: string
+    modelName?: string
+    baseUrl?: string
+    apiKeyCipher?: string
+    temperature?: number
+    maxTokens?: number
+  }
+
+  type ModelConfigEditRequest = {
+    id?: number
+    provider?: string
+    modelName?: string
+    baseUrl?: string
+    apiKeyCipher?: string
+    temperature?: number
+    maxTokens?: number
+    enabled?: number
+    isDefault?: number
+  }
+
+  type ModelConfigQueryRequest = {
+    pageNum?: number
+    pageSize?: number
+    sortField?: string
+    sortOrder?: string
+    provider?: string
+    modelName?: string
+    enabled?: number
+  }
+
+  type ModelConfigRuntimeVO = {
+    provider?: string
+    modelName?: string
+    baseUrl?: string
+    apiKey?: string
+  }
+
+  type ModelConfigVO = {
+    id?: number
+    userId?: number
+    provider?: string
+    modelName?: string
+    baseUrl?: string
+    temperature?: number
+    maxTokens?: number
+    configVersion?: number
+    enabled?: number
+    isDefault?: number
+    createTime?: string
+    updateTime?: string
+  }
+
   type PageApp = {
     records?: App[]
     pageNumber?: number
@@ -266,8 +371,8 @@ declare namespace API {
     optimizeCountQuery?: boolean
   }
 
-  type PageUser = {
-    records?: User[]
+  type PageChatHistoryVO = {
+    records?: ChatHistoryVO[]
     pageNumber?: number
     pageSize?: number
     totalPage?: number
@@ -275,8 +380,17 @@ declare namespace API {
     optimizeCountQuery?: boolean
   }
 
-  type PageChatHistoryVO = {
-    records?: ChatHistoryVO[]
+  type PageModelConfigVO = {
+    records?: ModelConfigVO[]
+    pageNumber?: number
+    pageSize?: number
+    totalPage?: number
+    totalRow?: number
+    optimizeCountQuery?: boolean
+  }
+
+  type PageUser = {
+    records?: User[]
     pageNumber?: number
     pageSize?: number
     totalPage?: number
@@ -294,6 +408,21 @@ declare namespace API {
   }
 
   type ServerSentEventString = true
+
+  type ToolEventVO = {
+    type?: string
+    text?: string
+  }
+
+  type UsageStatsVO = {
+    totalInputTokens?: number
+    totalOutputTokens?: number
+    totalMessages?: number
+    totalApps?: number
+    totalSessions?: number
+    avgLatencyMs?: number
+    recentDailyUsage?: DailyUsageVO[]
+  }
 
   type User = {
     id?: number
@@ -326,7 +455,6 @@ declare namespace API {
     userName?: string
     userAvatar?: string
     userProfile?: string
-    userRole?: string
   }
 
   type UserLoginRequest = {
@@ -368,5 +496,19 @@ declare namespace API {
     userProfile?: string
     userRole?: string
     createTime?: string
+  }
+
+  type AppVersionVO = {
+    id?: number
+    appId?: number
+    versionNo?: number
+    status?: string
+    createTime?: string
+  }
+
+  type BaseResponseListAppVersionVO = {
+    code?: number
+    data?: AppVersionVO[]
+    message?: string
   }
 }

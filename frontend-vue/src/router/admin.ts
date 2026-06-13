@@ -7,15 +7,15 @@ export default [
     name: 'admin_user',
     component: UserManagePage,
     meta: {
-      name: '用户管理'
-    }
+      name: '用户管理',
+    },
   },
   {
     path: '/admin/appManage',
     name: 'admin_app',
     component: () => import('@/pages/admin/AppAdminPage.vue'),
     meta: {
-      name: '应用管理'
-    }
-  }
+      name: '应用管理',
+    },
+  },
 ] as Array<RouteRecordRaw>

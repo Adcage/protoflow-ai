@@ -1,5 +1,5 @@
 <template>
-  <a-config-provider :locale="zhCN">
+  <a-config-provider :locale="zhCN" :theme="darkTheme">
     <BasicLayout />
   </a-config-provider>
 </template>
@@ -7,27 +7,24 @@
 <script lang="ts" setup>
 import BasicLayout from '@/layouts/BasicLayout.vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
+import { theme } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 
 dayjs.locale('zh-cn')
+
+const darkTheme = {
+  algorithm: theme.darkAlgorithm,
+  token: {
+    colorPrimary: '#22C55E',
+    colorBgContainer: '#1E293B',
+    colorBgElevated: '#334155',
+    colorBgLayout: '#0F172A',
+    colorBorder: '#475569',
+    colorText: '#F8FAFC',
+    colorTextSecondary: '#94A3B8',
+    borderRadius: 8,
+    fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+}
 </script>
-
-<style>
-/* 全局样式重置 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html,
-body {
-  height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-#app {
-  height: 100%;
-}
-</style>
