@@ -1,4 +1,4 @@
-package com.adcage.acaicodefree.ai.tools;
+package com.adcage.acaicodefree.legacy.ai.tools;
 
 import com.adcage.acaicodefree.exception.BusinessException;
 import org.junit.jupiter.api.Assertions;

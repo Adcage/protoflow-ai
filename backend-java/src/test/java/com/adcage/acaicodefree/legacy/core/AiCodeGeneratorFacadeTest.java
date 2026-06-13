@@ -1,8 +1,8 @@
-package com.adcage.acaicodefree.core;
+package com.adcage.acaicodefree.legacy.core;
 
-import com.adcage.acaicodefree.ai.AiCodeGenServiceFactory;
-import com.adcage.acaicodefree.ai.AiCodeGeneratorService;
-import com.adcage.acaicodefree.ai.guardrail.PromptSafetyInputGuardrail;
+import com.adcage.acaicodefree.legacy.ai.AiCodeGenServiceFactory;
+import com.adcage.acaicodefree.legacy.ai.AiCodeGeneratorService;
+import com.adcage.acaicodefree.legacy.ai.guardrail.PromptSafetyInputGuardrail;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;

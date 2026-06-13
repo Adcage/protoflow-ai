@@ -1,15 +1,15 @@
-package com.adcage.acaicodefree.workflow.service;
+package com.adcage.acaicodefree.legacy.workflow.service;
 
-import com.adcage.acaicodefree.workflow.model.ImageCategoryEnum;
-import com.adcage.acaicodefree.workflow.model.ImageCollectionPlan;
-import com.adcage.acaicodefree.workflow.model.ImageResource;
-import com.adcage.acaicodefree.workflow.node.concurrent.ContentImageCollectorNode;
-import com.adcage.acaicodefree.workflow.node.concurrent.DiagramCollectorNode;
-import com.adcage.acaicodefree.workflow.node.concurrent.ImageAggregatorNode;
-import com.adcage.acaicodefree.workflow.node.concurrent.ImagePlanNode;
-import com.adcage.acaicodefree.workflow.node.concurrent.IllustrationCollectorNode;
-import com.adcage.acaicodefree.workflow.node.concurrent.LogoCollectorNode;
-import com.adcage.acaicodefree.workflow.state.WorkflowContext;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCategoryEnum;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCollectionPlan;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageResource;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.ContentImageCollectorNode;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.DiagramCollectorNode;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.ImageAggregatorNode;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.ImagePlanNode;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.IllustrationCollectorNode;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.LogoCollectorNode;
+import com.adcage.acaicodefree.legacy.workflow.state.WorkflowContext;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphRepresentation;
 import org.bsc.langgraph4j.state.AgentState;

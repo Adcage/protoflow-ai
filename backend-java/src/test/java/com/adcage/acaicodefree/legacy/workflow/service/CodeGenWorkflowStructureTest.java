@@ -1,8 +1,8 @@
-package com.adcage.acaicodefree.workflow.service;
+package com.adcage.acaicodefree.legacy.workflow.service;
 
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
-import com.adcage.acaicodefree.workflow.model.QualityResult;
-import com.adcage.acaicodefree.workflow.state.WorkflowContext;
+import com.adcage.acaicodefree.legacy.workflow.model.QualityResult;
+import com.adcage.acaicodefree.legacy.workflow.state.WorkflowContext;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphRepresentation;
 import org.bsc.langgraph4j.state.AgentState;

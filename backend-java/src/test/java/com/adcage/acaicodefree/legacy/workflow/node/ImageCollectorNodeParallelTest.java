@@ -1,10 +1,10 @@
-package com.adcage.acaicodefree.workflow.node;
+package com.adcage.acaicodefree.legacy.workflow.node;
 
-import com.adcage.acaicodefree.workflow.ai.ImageCollectionPlanService;
-import com.adcage.acaicodefree.workflow.model.ImageCategoryEnum;
-import com.adcage.acaicodefree.workflow.model.ImageCollectionPlan;
-import com.adcage.acaicodefree.workflow.model.ImageResource;
-import com.adcage.acaicodefree.workflow.state.WorkflowContext;
+import com.adcage.acaicodefree.legacy.workflow.ai.ImageCollectionPlanService;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCategoryEnum;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCollectionPlan;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageResource;
+import com.adcage.acaicodefree.legacy.workflow.state.WorkflowContext;
 import org.bsc.langgraph4j.state.AgentState;
 import org.junit.jupiter.api.Test;
 

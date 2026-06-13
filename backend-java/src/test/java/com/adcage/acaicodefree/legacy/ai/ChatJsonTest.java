@@ -1,4 +1,4 @@
-package com.adcage.acaicodefree.ai;
+package com.adcage.acaicodefree.legacy.ai;
 
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.data.message.UserMessage;

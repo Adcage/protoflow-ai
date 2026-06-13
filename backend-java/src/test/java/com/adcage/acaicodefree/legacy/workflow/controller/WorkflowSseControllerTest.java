@@ -1,6 +1,6 @@
-package com.adcage.acaicodefree.workflow.controller;
+package com.adcage.acaicodefree.legacy.workflow.controller;
 
-import com.adcage.acaicodefree.workflow.service.WorkflowCodeGeneratorService;
+import com.adcage.acaicodefree.legacy.workflow.service.WorkflowCodeGeneratorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;

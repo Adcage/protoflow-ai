@@ -1,9 +1,10 @@
-package com.adcage.acaicodefree.service.impl;
+package com.adcage.acaicodefree.legacy.workflow.service;
 
 import com.adcage.acaicodefree.constant.UserConstant;
-import com.adcage.acaicodefree.core.AiCodeGeneratorFacade;
+import com.adcage.acaicodefree.legacy.core.AiCodeGeneratorFacade;
 import com.adcage.acaicodefree.core.handler.StreamHandlerExecutor;
 import com.adcage.acaicodefree.exception.BusinessException;
+import com.adcage.acaicodefree.service.impl.AppServiceImpl;
 import com.adcage.acaicodefree.mapper.AppMapper;
 import com.adcage.acaicodefree.mapper.ChatHistoryMapper;
 import com.adcage.acaicodefree.mapper.ChatSessionMapper;
@@ -18,8 +19,8 @@ import com.adcage.acaicodefree.runtime.CodeGenerationRuntimeRouter;
 import com.adcage.acaicodefree.config.properties.WorkspaceProperties;
 import com.adcage.acaicodefree.service.AgentRunService;
 import com.adcage.acaicodefree.service.ModelConfigService;
-import com.adcage.acaicodefree.workflow.config.WorkflowProperties;
-import com.adcage.acaicodefree.workflow.service.WorkflowCodeGeneratorService;
+import com.adcage.acaicodefree.legacy.workflow.config.WorkflowProperties;
+import com.adcage.acaicodefree.legacy.workflow.service.WorkflowCodeGeneratorService;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;

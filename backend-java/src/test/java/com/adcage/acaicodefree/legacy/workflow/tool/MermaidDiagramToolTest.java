@@ -1,7 +1,7 @@
-package com.adcage.acaicodefree.workflow.tool;
+package com.adcage.acaicodefree.legacy.workflow.tool;
 
 import com.adcage.acaicodefree.config.properties.StorageProperties;
-import com.adcage.acaicodefree.workflow.model.ImageCategoryEnum;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCategoryEnum;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

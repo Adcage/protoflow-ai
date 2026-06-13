@@ -1,7 +1,7 @@
-package com.adcage.acaicodefree.workflow.node;
+package com.adcage.acaicodefree.legacy.workflow.node;
 
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
-import com.adcage.acaicodefree.workflow.state.WorkflowContext;
+import com.adcage.acaicodefree.legacy.workflow.state.WorkflowContext;
 import org.bsc.langgraph4j.state.AgentState;
 import org.junit.jupiter.api.Test;
 

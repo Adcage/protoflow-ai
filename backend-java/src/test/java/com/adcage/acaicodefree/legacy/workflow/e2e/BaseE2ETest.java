@@ -1,4 +1,4 @@
-package com.adcage.acaicodefree.workflow.e2e;
+package com.adcage.acaicodefree.legacy.workflow.e2e;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIf;

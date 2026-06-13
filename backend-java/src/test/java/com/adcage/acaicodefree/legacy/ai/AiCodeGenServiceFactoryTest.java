@@ -1,6 +1,6 @@
-package com.adcage.acaicodefree.ai;
+package com.adcage.acaicodefree.legacy.ai;
 
-import com.adcage.acaicodefree.core.memory.ChatMemoryLoader;
+import com.adcage.acaicodefree.legacy.core.memory.ChatMemoryLoader;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;

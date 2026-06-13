@@ -1,15 +1,15 @@
-package com.adcage.acaicodefree.workflow.e2e;
+package com.adcage.acaicodefree.legacy.workflow.e2e;
 
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpUtil;
-import com.adcage.acaicodefree.workflow.model.ImageCategoryEnum;
-import com.adcage.acaicodefree.workflow.model.ImageResource;
-import com.adcage.acaicodefree.workflow.tool.ImageSearchTool;
-import com.adcage.acaicodefree.workflow.tool.LogoGeneratorTool;
-import com.adcage.acaicodefree.workflow.tool.MermaidDiagramTool;
-import com.adcage.acaicodefree.workflow.tool.ObjectStorageManager;
-import com.adcage.acaicodefree.workflow.tool.UndrawIllustrationTool;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCategoryEnum;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageResource;
+import com.adcage.acaicodefree.legacy.workflow.tool.ImageSearchTool;
+import com.adcage.acaicodefree.legacy.workflow.tool.LogoGeneratorTool;
+import com.adcage.acaicodefree.legacy.workflow.tool.MermaidDiagramTool;
+import com.adcage.acaicodefree.legacy.workflow.tool.ObjectStorageManager;
+import com.adcage.acaicodefree.legacy.workflow.tool.UndrawIllustrationTool;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

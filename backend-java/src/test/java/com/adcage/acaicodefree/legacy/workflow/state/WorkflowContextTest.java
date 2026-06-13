@@ -1,9 +1,9 @@
-package com.adcage.acaicodefree.workflow.state;
+package com.adcage.acaicodefree.legacy.workflow.state;
 
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
-import com.adcage.acaicodefree.workflow.model.ImageCategoryEnum;
-import com.adcage.acaicodefree.workflow.model.ImageResource;
-import com.adcage.acaicodefree.workflow.model.QualityResult;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCategoryEnum;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageResource;
+import com.adcage.acaicodefree.legacy.workflow.model.QualityResult;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.state.AgentState;

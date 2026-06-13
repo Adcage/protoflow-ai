@@ -1,15 +1,15 @@
-package com.adcage.acaicodefree.workflow.e2e;
+package com.adcage.acaicodefree.legacy.workflow.e2e;
 
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
-import com.adcage.acaicodefree.workflow.model.ImageCategoryEnum;
-import com.adcage.acaicodefree.workflow.model.ImageCollectionPlan;
-import com.adcage.acaicodefree.workflow.model.ImageResource;
-import com.adcage.acaicodefree.workflow.model.QualityResult;
-import com.adcage.acaicodefree.workflow.node.*;
-import com.adcage.acaicodefree.workflow.node.concurrent.*;
-import com.adcage.acaicodefree.workflow.state.WorkflowContext;
-import com.adcage.acaicodefree.workflow.service.CodeGenConcurrentWorkflow;
-import com.adcage.acaicodefree.workflow.service.CodeGenWorkflow;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCategoryEnum;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageCollectionPlan;
+import com.adcage.acaicodefree.legacy.workflow.model.ImageResource;
+import com.adcage.acaicodefree.legacy.workflow.model.QualityResult;
+import com.adcage.acaicodefree.legacy.workflow.node.*;
+import com.adcage.acaicodefree.legacy.workflow.node.concurrent.*;
+import com.adcage.acaicodefree.legacy.workflow.state.WorkflowContext;
+import com.adcage.acaicodefree.legacy.workflow.service.CodeGenConcurrentWorkflow;
+import com.adcage.acaicodefree.legacy.workflow.service.CodeGenWorkflow;
 import org.bsc.langgraph4j.state.AgentState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

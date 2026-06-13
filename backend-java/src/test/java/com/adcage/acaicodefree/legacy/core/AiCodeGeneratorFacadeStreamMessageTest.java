@@ -1,9 +1,9 @@
-package com.adcage.acaicodefree.core;
+package com.adcage.acaicodefree.legacy.core;
 
 import cn.hutool.json.JSONUtil;
-import com.adcage.acaicodefree.ai.AiCodeGenServiceFactory;
-import com.adcage.acaicodefree.ai.AiCodeGeneratorService;
-import com.adcage.acaicodefree.ai.guardrail.PromptSafetyInputGuardrail;
+import com.adcage.acaicodefree.legacy.ai.AiCodeGenServiceFactory;
+import com.adcage.acaicodefree.legacy.ai.AiCodeGeneratorService;
+import com.adcage.acaicodefree.legacy.ai.guardrail.PromptSafetyInputGuardrail;
 import com.adcage.acaicodefree.ai.model.message.AiResponseMessage;
 import com.adcage.acaicodefree.ai.model.message.StreamMessageTypeEnum;
 import com.adcage.acaicodefree.ai.model.message.ToolExecutedMessage;

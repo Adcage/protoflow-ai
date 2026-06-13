@@ -1,7 +1,7 @@
-package com.adcage.acaicodefree.core;
+package com.adcage.acaicodefree.legacy.core;
 
-import com.adcage.acaicodefree.ai.model.SingleCodeResult;
-import com.adcage.acaicodefree.ai.model.MultiFileCodeResult;
+import com.adcage.acaicodefree.legacy.ai.model.SingleCodeResult;
+import com.adcage.acaicodefree.legacy.ai.model.MultiFileCodeResult;
 import com.adcage.acaicodefree.common.ErrorCode;
 import com.adcage.acaicodefree.exception.BusinessException;
 import org.junit.jupiter.api.Test;
