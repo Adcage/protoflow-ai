@@ -144,6 +144,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
+        <!-- DevTools: 开发环境热重载 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
         <!-- Knife4j OpenAPI文档: 基于Swagger的增强API文档工具，提供更美观的接口文档界面 -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>

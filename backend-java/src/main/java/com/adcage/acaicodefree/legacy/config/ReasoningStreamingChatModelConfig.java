@@ -1,4 +1,4 @@
-package com.adcage.acaicodefree.config;
+package com.adcage.acaicodefree.legacy.config;
 
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
