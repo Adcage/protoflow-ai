@@ -1,4 +1,3 @@
-import grpc
 import logging
 
 from app.core.error_codes import AgentErrorCode
@@ -6,6 +5,7 @@ from app.grpc import code_generation_pb2
 from app.grpc import code_generation_pb2_grpc
 from app.grpc import common_pb2
 from app.grpc_client.platform_client import GrpcPlatformClient
+from app.runtime.orchestrator import RuntimeOrchestrator
 from app.services.chat_model_factory import ChatModelFactory
 from app.services.prompt_enhancer import PromptEnhancerService
 
@@ -15,13 +15,49 @@ logger = logging.getLogger("app.grpc_server.code_generation_servicer")
 class CodeGenerationServicer(code_generation_pb2_grpc.CodeGenerationServiceServicer):
 
     async def StreamGenerate(self, request, context):
-        await context.abort(grpc.StatusCode.UNIMPLEMENTED, "StreamGenerate not yet implemented")
+        logger.info("StreamGenerate | agentRunId=%s appId=%s", request.agent_run_id, request.app_id)
+        try:
+            orchestrator = RuntimeOrchestrator()
+            async for event in orchestrator.stream_generate(request):
+                yield event
+        except Exception as e:
+            logger.error("StreamGenerate error | agentRunId=%s error=%s", request.agent_run_id, e, exc_info=True)
+            yield code_generation_pb2.CodeGenerationEvent(
+                agent_run_id=request.agent_run_id,
+                seq=1,
+                event_type=common_pb2.ERROR,
+                error=common_pb2.ErrorData(message=str(e), code=AgentErrorCode.INTERNAL_ERROR),
+            )
 
     async def StreamModify(self, request, context):
-        await context.abort(grpc.StatusCode.UNIMPLEMENTED, "StreamModify not yet implemented")
+        logger.info("StreamModify | agentRunId=%s appId=%s", request.agent_run_id, request.app_id)
+        try:
+            orchestrator = RuntimeOrchestrator()
+            async for event in orchestrator.stream_modify(request):
+                yield event
+        except Exception as e:
+            logger.error("StreamModify error | agentRunId=%s error=%s", request.agent_run_id, e, exc_info=True)
+            yield code_generation_pb2.CodeGenerationEvent(
+                agent_run_id=request.agent_run_id,
+                seq=1,
+                event_type=common_pb2.ERROR,
+                error=common_pb2.ErrorData(message=str(e), code=AgentErrorCode.INTERNAL_ERROR),
+            )
 
     async def RouteCodeGenType(self, request, context):
-        await context.abort(grpc.StatusCode.UNIMPLEMENTED, "RouteCodeGenType not yet implemented")
+        prompt = request.prompt.lower() if request.prompt else ""
+        vue_keywords = ["vue", "项目", "多页面", "后台", "管理系统", "dashboard"]
+        multi_keywords = ["多个文件", "css", "js", "multi"]
+
+        if any(kw in prompt for kw in vue_keywords):
+            code_gen_type = common_pb2.VUE_PROJECT
+        elif any(kw in prompt for kw in multi_keywords):
+            code_gen_type = common_pb2.MULTI_FILE
+        else:
+            code_gen_type = common_pb2.SINGLE_FILE
+
+        logger.info("RouteCodeGenType | promptLen=%d result=%s", len(request.prompt), code_gen_type)
+        return code_generation_pb2.RouteCodeGenTypeResponse(code_gen_type=code_gen_type)
 
     async def ValidatePrompt(self, request, context):
         prompt = request.prompt

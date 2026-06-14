@@ -84,7 +84,7 @@ def _record_completion(method: str, start: float, status: str) -> None:
 
 
 def _wrap_handler(handler, unary_unary=None, unary_stream=None):
-    return aio.RpcMethodHandler(
+    return _RpcMethodHandler(
         unary_unary=unary_unary or handler.unary_unary,
         unary_stream=unary_stream or handler.unary_stream,
         stream_unary=handler.stream_unary,
@@ -92,6 +92,42 @@ def _wrap_handler(handler, unary_unary=None, unary_stream=None):
         request_deserializer=handler.request_deserializer,
         response_serializer=handler.response_serializer,
     )
+
+
+class _RpcMethodHandler(grpc.RpcMethodHandler):
+    def __init__(self, *, unary_unary=None, unary_stream=None,
+                 stream_unary=None, stream_stream=None,
+                 request_deserializer=None, response_serializer=None):
+        self._unary_unary = unary_unary
+        self._unary_stream = unary_stream
+        self._stream_unary = stream_unary
+        self._stream_stream = stream_stream
+        self.request_deserializer = request_deserializer
+        self.response_serializer = response_serializer
+
+    @property
+    def request_streaming(self):
+        return self._stream_unary is not None or self._stream_stream is not None
+
+    @property
+    def response_streaming(self):
+        return self._unary_stream is not None or self._stream_stream is not None
+
+    @property
+    def unary_unary(self):
+        return self._unary_unary
+
+    @property
+    def unary_stream(self):
+        return self._unary_stream
+
+    @property
+    def stream_unary(self):
+        return self._stream_unary
+
+    @property
+    def stream_stream(self):
+        return self._stream_stream
 
 
 def _extract_metadata(metadata, key: str) -> str | None:
