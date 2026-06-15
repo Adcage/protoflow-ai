@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ac-template/v1",
+  "id": "landing",
+  "name": "Landing Page",
+  "description": "SaaS landing page reference with hero, feature grid, social proof, pricing and closing CTA sections.",
+  "kind": "html-reference",
+  "codeGenType": "single_file",
+  "triggers": ["landing", "saas", "marketing", "homepage", "官网", "首页", "产品页"],
+  "entry": "index.html",
+  "maxPromptFiles": 1,
+  "references": ["references/layout.md"],
+  "checklists": ["references/checklist.md"],
+  "files": ["files/index.html"]
+}

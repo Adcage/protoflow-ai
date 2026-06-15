@@ -9,6 +9,10 @@ from app.capabilities.craft.types import CraftDefinition
 logger = logging.getLogger("app.capabilities.craft.loader")
 
 
+def _default_name_from_id(craft_id: str) -> str:
+    return " ".join(part.capitalize() for part in craft_id.replace("_", "-").split("-"))
+
+
 def _map_frontmatter_to_craft(
     doc_metadata: dict[str, object],
     body: str,
@@ -17,8 +21,7 @@ def _map_frontmatter_to_craft(
 ) -> CraftDefinition | None:
     name = doc_metadata.get("name")
     if not isinstance(name, str) or not name:
-        logger.warning("Craft asset missing 'name' field: %s", source_path)
-        return None
+        name = _default_name_from_id(craft_id)
 
     description = doc_metadata.get("description")
     if not isinstance(description, str):

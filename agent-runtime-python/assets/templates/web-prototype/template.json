@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ac-template/v1",
+  "id": "web-prototype",
+  "name": "Web Prototype",
+  "description": "General-purpose web prototype with CSS variable token system, pre-defined classes, layout library and quality checklist.",
+  "kind": "html-reference",
+  "codeGenType": "single_file",
+  "triggers": ["prototype", "landing", "marketing", "homepage", "官网", "首页"],
+  "entry": "index.html",
+  "maxPromptFiles": 1,
+  "references": ["references/layouts.md"],
+  "checklists": ["references/checklist.md"],
+  "files": ["files/index.html"]
+}

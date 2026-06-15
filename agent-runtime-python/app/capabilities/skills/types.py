@@ -35,3 +35,8 @@ class SkillDefinition:
     body: str
     source_path: Path
     metadata: dict[str, Any] = field(default_factory=dict)
+    when_to_use: str = ""
+    target_code_gen_types: tuple[str, ...] = ()
+    related_templates: tuple[str, ...] = ()
+    recommended_seeds: tuple[str, ...] = ()
+    output_contract: str = ""

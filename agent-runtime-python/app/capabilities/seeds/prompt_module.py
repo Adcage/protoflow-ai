@@ -33,4 +33,16 @@ class SeedModule(PromptModule):
         if seed.entry:
             lines.append(f"Entry file: {seed.entry}")
 
+        lines.extend(
+            [
+                "",
+                "### Seed Constraints",
+                "",
+                "- The seed has already initialized the workspace.",
+                "- Keep package.json, src/main.ts and src/App.vue consistent.",
+                "- Add components only when they reduce complexity or match the selected template.",
+                "- Remove visible placeholder content introduced by the seed before finalizing.",
+            ]
+        )
+
         return "\n".join(lines)

@@ -20,9 +20,7 @@ def _parse_seed_json(seed_json_path: Path) -> SeedDefinition | None:
 
     schema_version = data.get("schemaVersion")
     if schema_version != SCHEMA_VERSION:
-        logger.warning(
-            "Unsupported seed schema version: %s in %s", schema_version, seed_json_path
-        )
+        logger.warning("Unsupported seed schema version: %s in %s", schema_version, seed_json_path)
         return None
 
     seed_id = data.get("id")

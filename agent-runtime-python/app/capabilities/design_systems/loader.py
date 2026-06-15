@@ -9,7 +9,15 @@ from app.capabilities.design_systems.types import DesignSystemDefinition, Design
 logger = logging.getLogger("app.capabilities.design_systems.loader")
 
 REQUIRED_FILES_KEYS = {"design"}
-OPTIONAL_FILES_KEYS = {"tokens", "design_tokens", "components_manifest", "components", "usage"}
+OPTIONAL_FILES_KEYS = {
+    "tokens",
+    "design_tokens",
+    "designTokens",
+    "components_manifest",
+    "componentsManifest",
+    "components",
+    "usage",
+}
 
 
 def _resolve_file(ds_dir: Path, filename: str | None) -> Path | None:
@@ -60,11 +68,19 @@ def _parse_manifest(manifest_path: Path) -> DesignSystemDefinition | None:
         logger.warning("Required design file missing for %s: %s", ds_id, design_filename)
         return None
 
+    components_manifest_value = (
+        raw_files.get("components_manifest")
+        or raw_files.get("componentsManifest")
+        or data.get("componentsManifest")
+    )
+    design_tokens_value = raw_files.get("design_tokens") or raw_files.get("designTokens")
+    usage_value = raw_files.get("usage") or data.get("usage")
+
     tokens_path = _resolve_file(ds_dir, raw_files.get("tokens"))
-    design_tokens_path = _resolve_file(ds_dir, raw_files.get("design_tokens"))
-    components_manifest_path = _resolve_file(ds_dir, raw_files.get("components_manifest"))
+    design_tokens_path = _resolve_file(ds_dir, design_tokens_value)
+    components_manifest_path = _resolve_file(ds_dir, components_manifest_value)
     components_path = _resolve_file(ds_dir, raw_files.get("components"))
-    usage_path = _resolve_file(ds_dir, raw_files.get("usage"))
+    usage_path = _resolve_file(ds_dir, usage_value)
 
     files = DesignSystemFiles(
         design=design_path,

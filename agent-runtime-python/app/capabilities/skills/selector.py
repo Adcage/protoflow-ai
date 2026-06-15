@@ -7,7 +7,8 @@ logger = logging.getLogger("app.capabilities.skills.selector")
 
 
 class SkillSelector:
-    def select(self, prompt: str, registry: SkillRegistry) -> SkillDefinition | None:
+    def select(self, prompt: str, registry: SkillRegistry) -> list[SkillDefinition]:
+        """Return skills sorted by relevance score, highest first."""
         prompt_lower = prompt.lower()
         candidates: list[tuple[int, str, SkillDefinition]] = []
 
@@ -18,8 +19,5 @@ class SkillSelector:
             if score > 0:
                 candidates.append((score, skill.id, skill))
 
-        if not candidates:
-            return None
-
         candidates.sort(key=lambda item: (-item[0], item[1]))
-        return candidates[0][2]
+        return [item[2] for item in candidates]

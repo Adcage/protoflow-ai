@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ac-template/v1",
+  "id": "dashboard",
+  "name": "Dashboard",
+  "description": "Analytics dashboard reference with sidebar navigation, topbar, KPI grid, chart panel and recent events table.",
+  "kind": "html-reference",
+  "codeGenType": "single_file",
+  "triggers": ["dashboard", "admin", "analytics", "后台", "管理后台", "看板"],
+  "entry": "index.html",
+  "maxPromptFiles": 1,
+  "references": ["references/layout.md"],
+  "checklists": ["references/checklist.md"],
+  "files": ["files/index.html"]
+}

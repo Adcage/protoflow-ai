@@ -10,6 +10,9 @@ DESIGN_SYSTEM_ID_HINTS: dict[str, str] = {
     "ant": "ant",
     "antd": "ant",
     "ant design": "ant",
+    "enterprise": "enterprise",
+    "clean": "clean",
+    "dashboard": "dashboard",
     "material": "material",
     "tailwind": "tailwind",
 }
@@ -27,6 +30,7 @@ class DesignSystemSelector:
         if len(all_ds) == 0:
             return None
 
+        # Priority 1: prompt explicitly specifies a supported design system
         hinted_id = self._extract_hinted_id(prompt)
         if hinted_id is not None:
             try:
@@ -36,13 +40,25 @@ class DesignSystemSelector:
             except KeyError:
                 logger.warning("Prompt hinted design system not found: %s", hinted_id)
 
-        try:
-            ds = registry.get("default")
-            logger.info("Design system selected: default")
-            return ds
-        except KeyError:
-            pass
+        # Priority 2: skill scenario=operations and ant exists -> ant
+        if skill is not None and getattr(skill, "scenario", "").lower() == "operations":
+            try:
+                ds = registry.get("ant")
+                logger.info("Design system selected by skill scenario=operations: ant")
+                return ds
+            except KeyError:
+                pass
 
+        # Priority 3: code_gen_type=vue_project and default exists -> default
+        if code_gen_type == "vue_project":
+            try:
+                ds = registry.get("default")
+                logger.info("Design system selected: default")
+                return ds
+            except KeyError:
+                pass
+
+        # Priority 4: fallback to first id alphabetically
         fallback = min(all_ds, key=lambda d: d.id)
         logger.info("Design system selected by fallback (smallest id): %s", fallback.id)
         return fallback

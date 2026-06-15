@@ -15,9 +15,19 @@ class SeedSelector:
         code_gen_type: str,
         run_mode: str,
         registry: SeedRegistry,
+        recommended_seed_ids: tuple[str, ...] = (),
     ) -> SeedDefinition | None:
         if run_mode != "generate":
             return None
+
+        if recommended_seed_ids:
+            for seed_id in recommended_seed_ids:
+                try:
+                    seed = registry.get(seed_id)
+                except KeyError:
+                    continue
+                if seed.code_gen_type == code_gen_type:
+                    return seed
 
         prompt_lower = prompt.lower()
         candidates: list[tuple[int, str, SeedDefinition]] = []

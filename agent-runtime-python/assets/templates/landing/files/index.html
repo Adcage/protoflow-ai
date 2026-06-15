@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>[REPLACE] Landing page</title>
+  <style>
+    :root {
+      --bg: #fafaf9; --fg: #1c1b1a; --muted: #6b6964; --border: #e6e4e0;
+      --accent: #c96442; --surface: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, system-ui, sans-serif; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
+    .logo { font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
+    nav a { color: var(--fg); text-decoration: none; margin-left: 22px; font-size: 14px; }
+    button { font: inherit; cursor: pointer; padding: 11px 20px; border-radius: 8px; font-weight: 500; }
+    .btn-primary { background: var(--accent); color: white; border: 1px solid var(--accent); }
+    .btn-secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+    .btn-link { background: transparent; border: none; color: var(--accent); padding: 11px 0; font-weight: 500; cursor: pointer; }
+    section { padding: 80px 0; }
+    .hero { padding: 100px 0; }
+    .hero h1 { font-size: clamp(44px, 6vw, 76px); line-height: 1.05; letter-spacing: -0.02em; max-width: 17ch; margin: 0 0 22px; }
+    .hero p { font-size: 19px; color: var(--muted); max-width: 56ch; margin: 0 0 36px; }
+    .hero .cta { display: flex; gap: 12px; }
+    .features { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+    @media (max-width: 800px) { .feature-grid { grid-template-columns: 1fr; } }
+    .feature h3 { font-size: 18px; margin: 0 0 8px; letter-spacing: -0.01em; }
+    .feature .num { font-family: ui-monospace, monospace; color: var(--accent); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; display: block; }
+    .feature p { margin: 0; color: var(--muted); font-size: 14.5px; }
+    .proof { text-align: center; }
+    .proof h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0 0 28px; }
+    .logos { display: flex; justify-content: center; gap: 56px; flex-wrap: wrap; opacity: 0.6; font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
+    .closing { background: var(--accent); color: white; text-align: center; }
+    .closing h2 { font-size: 38px; letter-spacing: -0.02em; margin: 0 0 14px; }
+    .closing p { opacity: 0.85; margin: 0 0 28px; }
+    .closing button { background: white; color: var(--accent); border: none; }
+    footer { padding: 28px 0; color: var(--muted); font-size: 13px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header data-od-id="topnav">
+      <span class="logo">[REPLACE] Brand</span>
+      <nav>
+        <a href="#features">[REPLACE] Features</a>
+        <a href="#pricing">[REPLACE] Pricing</a>
+        <a href="#docs">[REPLACE] Docs</a>
+        <button class="btn-secondary" style="margin-left: 12px;">[REPLACE] Sign in</button>
+      </nav>
+    </header>
+    <section class="hero" data-od-id="hero">
+      <h1>[REPLACE] One sharp sentence about the product.</h1>
+      <p>[REPLACE] One concrete-value subhead — what changes for the reader.</p>
+      <div class="cta">
+        <button class="btn-primary">[REPLACE] Get started</button>
+        <button class="btn-link">[REPLACE] Read more →</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="features" id="features" data-od-id="features">
+    <div class="wrap feature-grid">
+      <div class="feature">
+        <span class="num">01</span>
+        <h3>[REPLACE] Feature one</h3>
+        <p>[REPLACE] Two-sentence description that names the user value.</p>
+      </div>
+      <div class="feature">
+        <span class="num">02</span>
+        <h3>[REPLACE] Feature two</h3>
+        <p>[REPLACE] Two-sentence description that names the user value.</p>
+      </div>
+      <div class="feature">
+        <span class="num">03</span>
+        <h3>[REPLACE] Feature three</h3>
+        <p>[REPLACE] Two-sentence description that names the user value.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="proof wrap" data-od-id="proof">
+    <h2>[REPLACE] Used by teams at</h2>
+    <div class="logos"><span>[REPLACE]</span><span>[REPLACE]</span><span>[REPLACE]</span><span>[REPLACE]</span></div>
+  </section>
+
+  <section class="closing" data-od-id="closing">
+    <div class="wrap">
+      <h2>[REPLACE] Closing headline.</h2>
+      <p>[REPLACE] Supporting sentence with terms or risk reversal.</p>
+      <button>[REPLACE] Get started</button>
+    </div>
+  </section>
+
+  <footer class="wrap" data-od-id="footer">© [REPLACE] Brand · [REPLACE] Privacy · [REPLACE] Terms</footer>
+</body>
+</html>

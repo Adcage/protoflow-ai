@@ -13,3 +13,6 @@ class TemplateDefinition:
     max_prompt_files: int
     files: tuple[Path, ...]
     source_path: Path
+    references: tuple[Path, ...] = ()
+    checklists: tuple[Path, ...] = ()
+    kind: str = ""

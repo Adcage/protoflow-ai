@@ -9,7 +9,9 @@ from app.capabilities.templates.types import TemplateDefinition
 logger = logging.getLogger("app.capabilities.templates.loader")
 
 
-def _parse_template_json(data: dict[str, object], source_path: Path, template_id: str) -> TemplateDefinition | None:
+def _parse_template_json(
+    data: dict[str, object], source_path: Path, template_id: str
+) -> TemplateDefinition | None:
     name = data.get("name")
     if not isinstance(name, str) or not name:
         logger.warning("Template asset missing 'name' field: %s", source_path)
@@ -37,6 +39,20 @@ def _parse_template_json(data: dict[str, object], source_path: Path, template_id
     raw_files = data.get("files")
     files = tuple(Path(str(f)) for f in raw_files) if isinstance(raw_files, list) else ()
 
+    raw_references = data.get("references")
+    references = (
+        tuple(Path(str(r)) for r in raw_references) if isinstance(raw_references, list) else ()
+    )
+
+    raw_checklists = data.get("checklists")
+    checklists = (
+        tuple(Path(str(c)) for c in raw_checklists) if isinstance(raw_checklists, list) else ()
+    )
+
+    kind = data.get("kind")
+    if not isinstance(kind, str):
+        kind = ""
+
     return TemplateDefinition(
         id=template_id,
         name=name,
@@ -47,6 +63,9 @@ def _parse_template_json(data: dict[str, object], source_path: Path, template_id
         max_prompt_files=max_prompt_files,
         files=files,
         source_path=source_path,
+        references=references,
+        checklists=checklists,
+        kind=kind,
     )
 
 

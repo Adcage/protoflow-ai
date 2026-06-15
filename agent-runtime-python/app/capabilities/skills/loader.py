@@ -69,7 +69,17 @@ def _map_frontmatter_to_skill(
         )
         craft = SkillCraftRequirement(requires=craft_tuple)
 
-    known_keys = {"name", "description", "triggers", "od"}
+    ac = doc_metadata.get("ac")
+    if not isinstance(ac, dict):
+        ac = {}
+
+    when_to_use = str(ac.get("when_to_use", ""))
+    target_code_gen_types = tuple(str(v) for v in ac.get("target_code_gen_types", []) if v)
+    related_templates = tuple(str(v) for v in ac.get("related_templates", []) if v)
+    recommended_seeds = tuple(str(v) for v in ac.get("recommended_seeds", []) if v)
+    output_contract = str(ac.get("output_contract", ""))
+
+    known_keys = {"name", "description", "triggers", "od", "ac"}
     metadata = {k: v for k, v in doc_metadata.items() if k not in known_keys}
 
     return SkillDefinition(
@@ -86,6 +96,11 @@ def _map_frontmatter_to_skill(
         body=body,
         source_path=source_path,
         metadata=metadata,
+        when_to_use=when_to_use,
+        target_code_gen_types=target_code_gen_types,
+        related_templates=related_templates,
+        recommended_seeds=recommended_seeds,
+        output_contract=output_contract,
     )
 
 

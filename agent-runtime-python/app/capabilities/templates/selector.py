@@ -11,9 +11,23 @@ class TemplateSelector:
         self,
         prompt: str,
         code_gen_type: str,
-        skill_id: str | None,
-        registry: TemplateRegistry,
+        skill_id: str | None = None,
+        registry: TemplateRegistry | None = None,
+        *,
+        recommended_template_ids: tuple[str, ...] = (),
     ) -> TemplateDefinition | None:
+        if registry is None:
+            return None
+
+        if recommended_template_ids:
+            for template_id in recommended_template_ids:
+                try:
+                    template = registry.get(template_id)
+                except KeyError:
+                    continue
+                if not template.code_gen_type or template.code_gen_type == code_gen_type:
+                    return template
+
         prompt_lower = prompt.lower()
         candidates: list[tuple[int, str, TemplateDefinition]] = []
 
