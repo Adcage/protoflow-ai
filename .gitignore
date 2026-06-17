@@ -11,6 +11,13 @@ storage/
 logs/
 *.log
 
+# Debug outputs (may contain sensitive LLM audit data)
+debug/
+agent-runtime-python/debug/
+
+# Playwright accessibility snapshots
+home.yml
+
 # Java / Maven
 HELP.md
 backend-java/target/
@@ -24,9 +31,14 @@ frontend-vue/dist/
 frontend-vue/.vite/
 frontend-vue/coverage/
 
+# E2E test dependencies and results
+agent-runtime-python/tests/e2e/node_modules/
+agent-runtime-python/tests/e2e/test-results/
+
 # Python
 agent-runtime-python/.venv/
 agent-runtime-python/__pycache__/
+agent-runtime-python/**/__pycache__/
 agent-runtime-python/**/*.pyc
 agent-runtime-python/*.egg-info/
 agent-runtime-python/.pytest_cache/
