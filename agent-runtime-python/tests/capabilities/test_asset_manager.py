@@ -26,24 +26,11 @@ def _make_skill_registry(skill_id: str = "test-skill") -> SkillRegistry:
             id=skill_id,
             name=skill_id,
             description="test",
-            triggers=("test",),
-            mode="prototype",
-            platform="desktop",
-            scenario="operations",
-            preview=None,
-            design_system=SkillDesignSystemRequirement(),
-            craft=SkillCraftRequirement(),
             body="body",
             source_path=Path("."),
         )
     )
     return registry
-
-
-from app.capabilities.skills.types import (
-    SkillCraftRequirement,
-    SkillDesignSystemRequirement,
-)
 
 
 def _make_seed_registry(seed_id: str = "test-seed") -> SeedRegistry:
@@ -54,7 +41,6 @@ def _make_seed_registry(seed_id: str = "test-seed") -> SeedRegistry:
             name=seed_id,
             description="test",
             code_gen_type="vue_project",
-            triggers=("test",),
             entry="src/App.vue",
             files_dir=Path("/tmp/seed"),
             copy_mode="missing-only",
@@ -72,7 +58,6 @@ def _make_template_registry(template_id: str = "test-template") -> TemplateRegis
             name=template_id,
             description="test",
             code_gen_type="vue_project",
-            triggers=("test",),
             entry="src/App.vue",
             max_prompt_files=3,
             files=(Path("files/src/App.vue"),),
@@ -92,14 +77,14 @@ def _make_ds_registry(ds_id: str = "default") -> DesignSystemRegistry:
             description="test",
             import_mode="normalized",
             files=DesignSystemFiles(design=Path("/tmp/DESIGN.md")),
-            suggested_craft=("anti-slop",),
+            suggested_craft=("anti-ai-slop",),
             source_path=Path("."),
         )
     )
     return registry
 
 
-def _make_craft_registry(craft_id: str = "anti-slop") -> CraftRegistry:
+def _make_craft_registry(craft_id: str = "anti-ai-slop") -> CraftRegistry:
     registry = CraftRegistry()
     registry.register(
         CraftDefinition(
@@ -175,12 +160,6 @@ class TestAssetManager:
             "---\n"
             "name: dashboard\n"
             "description: Dashboard skill\n"
-            "triggers:\n"
-            "  - dashboard\n"
-            "od:\n"
-            "  mode: prototype\n"
-            "  platform: desktop\n"
-            "  scenario: operations\n"
             "---\n\n# Dashboard\n",
             encoding="utf-8",
         )

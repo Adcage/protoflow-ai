@@ -25,7 +25,7 @@ def _make_craft(
 class TestCraftSelector:
     def test_default_crafts_always_selected(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
         registry.register(
             _make_craft(
                 "state-coverage", "State Coverage", applies_to=("vue_project",), priority=30
@@ -36,12 +36,12 @@ class TestCraftSelector:
         result = selector.select("vue_project", registry)
 
         ids = [c.id for c in result]
-        assert "anti-slop" in ids
+        assert "anti-ai-slop" in ids
         assert "state-coverage" in ids
 
     def test_skill_required_crafts_added(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
         registry.register(_make_craft("state-coverage", "State Coverage", priority=30))
         registry.register(_make_craft("accessibility-baseline", "Accessibility", priority=50))
 
@@ -52,12 +52,12 @@ class TestCraftSelector:
 
         ids = [c.id for c in result]
         assert "accessibility-baseline" in ids
-        assert "anti-slop" in ids
+        assert "anti-ai-slop" in ids
         assert "state-coverage" in ids
 
     def test_design_system_suggested_crafts_added(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
         registry.register(_make_craft("state-coverage", "State Coverage", priority=30))
         registry.register(_make_craft("typography", "Typography", priority=40))
 
@@ -69,24 +69,24 @@ class TestCraftSelector:
 
     def test_deduplication_by_id(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
         registry.register(_make_craft("state-coverage", "State Coverage", priority=30))
 
         selector = CraftSelector()
         result = selector.select(
             "vue_project",
             registry,
-            required_craft_ids=("anti-slop",),
-            suggested_craft_ids=("anti-slop",),
+            required_craft_ids=("anti-ai-slop",),
+            suggested_craft_ids=("anti-ai-slop",),
         )
 
         ids = [c.id for c in result]
-        assert ids.count("anti-slop") == 1
+        assert ids.count("anti-ai-slop") == 1
 
     def test_priority_sorting(self):
         registry = CraftRegistry()
         registry.register(_make_craft("accessibility-baseline", "Accessibility", priority=50))
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
         registry.register(_make_craft("state-coverage", "State Coverage", priority=30))
 
         selector = CraftSelector()
@@ -97,7 +97,7 @@ class TestCraftSelector:
 
     def test_applies_to_filter_excludes_non_matching(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", applies_to=(), priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", applies_to=(), priority=10))
         registry.register(
             _make_craft(
                 "state-coverage", "State Coverage", applies_to=("vue_project",), priority=30
@@ -116,24 +116,24 @@ class TestCraftSelector:
 
     def test_empty_applies_to_matches_all(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", applies_to=(), priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", applies_to=(), priority=10))
 
         selector = CraftSelector()
         result = selector.select("single_file", registry)
 
         assert len(result) == 1
-        assert result[0].id == "anti-slop"
+        assert result[0].id == "anti-ai-slop"
 
     def test_missing_craft_id_skipped(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
 
         selector = CraftSelector()
         result = selector.select("vue_project", registry, required_craft_ids=("nonexistent",))
 
         ids = [c.id for c in result]
         assert "nonexistent" not in ids
-        assert "anti-slop" in ids
+        assert "anti-ai-slop" in ids
 
     def test_no_default_crafts_in_registry(self):
         registry = CraftRegistry()
@@ -145,7 +145,7 @@ class TestCraftSelector:
 
     def test_required_before_suggested_before_default(self):
         registry = CraftRegistry()
-        registry.register(_make_craft("anti-slop", "Anti Slop", priority=10))
+        registry.register(_make_craft("anti-ai-slop", "Anti AI Slop", priority=10))
         registry.register(_make_craft("state-coverage", "State Coverage", priority=30))
         registry.register(_make_craft("accessibility-baseline", "Accessibility", priority=50))
         registry.register(_make_craft("typography", "Typography", priority=40))
@@ -161,31 +161,8 @@ class TestCraftSelector:
         ids = [c.id for c in result]
         assert "accessibility-baseline" in ids
         assert "typography" in ids
-        assert "anti-slop" in ids
+        assert "anti-ai-slop" in ids
         assert "state-coverage" in ids
 
     def test_default_craft_ids_constant(self):
-        assert DEFAULT_CRAFT_IDS == ("anti-slop", "state-coverage")
-
-
-def test_craft_selector_resolves_anti_slop_alias():
-    registry = CraftRegistry()
-    registry.register(
-        CraftDefinition(
-            id="anti-ai-slop",
-            name="Anti AI Slop",
-            description="",
-            applies_to=(),
-            priority=10,
-            body="rules",
-            source_path=Path("anti-ai-slop.md"),
-        )
-    )
-
-    selected = CraftSelector(aliases={"anti-slop": "anti-ai-slop"}).select(
-        code_gen_type="vue_project",
-        registry=registry,
-        required_craft_ids=("anti-slop",),
-    )
-
-    assert [craft.id for craft in selected] == ["anti-ai-slop"]
+        assert DEFAULT_CRAFT_IDS == ("anti-ai-slop", "state-coverage")

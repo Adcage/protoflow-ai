@@ -6,12 +6,7 @@ import pytest
 from app.artifacts.writer import ArtifactWriter
 from app.capabilities.common.loader_result import SelectedCapabilities
 from app.capabilities.seeds.types import SeedDefinition
-from app.capabilities.skills.types import (
-    SkillCraftRequirement,
-    SkillDefinition,
-    SkillDesignSystemRequirement,
-    SkillPreview,
-)
+from app.capabilities.skills.types import SkillDefinition
 from app.nodes.collect_artifacts import CollectArtifactsNode
 from app.runtime.context import CodeGenType, ExecutionContext, RunMode
 from app.runtime.event_bus import EventBus
@@ -43,20 +38,13 @@ def _make_services(event_bus: EventBus | None = None) -> RuntimeServices:
 
 class TestCollectArtifactsNode:
     @pytest.mark.asyncio
-    async def test_skill_preview_entry(self, tmp_path: Path):
+    async def test_skill_selected_workspace_files_collected(self, tmp_path: Path):
         node = CollectArtifactsNode()
         context = _make_context(workspace_path=str(tmp_path))
         skill = SkillDefinition(
             id="dashboard",
             name="dashboard",
             description="Dashboard",
-            triggers=("dashboard",),
-            mode="prototype",
-            platform="desktop",
-            scenario="operations",
-            preview=SkillPreview(type="html", entry="index.html"),
-            design_system=SkillDesignSystemRequirement(),
-            craft=SkillCraftRequirement(),
             body="Build dashboard",
             source_path=Path("."),
         )
@@ -70,7 +58,8 @@ class TestCollectArtifactsNode:
         result = await node.run(context, state, services)
 
         assert result.artifact_manifest_path != ""
-        assert result.artifacts[0]["entry"] == "index.html"
+        assert len(result.artifacts) > 0
+        assert "entry" in result.artifacts[0]
 
     @pytest.mark.asyncio
     async def test_seed_entry_used(self, tmp_path: Path):
@@ -81,7 +70,6 @@ class TestCollectArtifactsNode:
             name="Vue Basic",
             description="Basic",
             code_gen_type="vue_project",
-            triggers=("vue",),
             entry="src/App.vue",
             files_dir=Path("/tmp/seed"),
             copy_mode="missing-only",
@@ -141,7 +129,7 @@ class TestCollectArtifactsNode:
             files_touched=["src/App.vue", "package.json"],
             selected_skill_id="dashboard",
             selected_design_system_id="default",
-            selected_craft_ids=["anti-slop"],
+            selected_craft_ids=["anti-ai-slop"],
             selected_capabilities=SelectedCapabilities(),
         )
         services = _make_services()

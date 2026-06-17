@@ -7,7 +7,6 @@ from app.capabilities.templates.types import TemplateDefinition
 def _make_template(
     id: str = "dashboard-analytics",
     name: str = "Analytics Dashboard",
-    triggers: tuple[str, ...] = ("dashboard", "analytics"),
     code_gen_type: str = "vue_project",
 ) -> TemplateDefinition:
     return TemplateDefinition(
@@ -15,7 +14,6 @@ def _make_template(
         name=name,
         description="Test template",
         code_gen_type=code_gen_type,
-        triggers=triggers,
         entry="files/src/App.vue",
         max_prompt_files=3,
         files=(Path("files/src/App.vue"),),
@@ -24,14 +22,14 @@ def _make_template(
 
 
 class TestTemplateSelector:
-    def test_select_by_trigger(self) -> None:
+    def test_select_first_matching_code_gen_type(self) -> None:
         from app.capabilities.templates.registry import TemplateRegistry
 
         registry = TemplateRegistry()
-        registry.register(_make_template(triggers=("dashboard", "后台")))
+        registry.register(_make_template(code_gen_type="vue_project"))
         selector = TemplateSelector()
 
-        result = selector.select("帮我生成一个后台看板", "vue_project", None, registry)
+        result = selector.select("vue_project", registry)
         assert result is not None
         assert result.id == "dashboard-analytics"
 
@@ -42,60 +40,17 @@ class TestTemplateSelector:
         registry.register(_make_template(code_gen_type="vue_project"))
         selector = TemplateSelector()
 
-        result = selector.select("dashboard", "single_file", None, registry)
+        result = selector.select("single_file", registry)
         assert result is None
 
     def test_no_match_returns_none(self) -> None:
         from app.capabilities.templates.registry import TemplateRegistry
 
         registry = TemplateRegistry()
-        registry.register(_make_template(triggers=("dashboard",)))
         selector = TemplateSelector()
 
-        result = selector.select("landing page", "vue_project", None, registry)
+        result = selector.select("vue_project", registry)
         assert result is None
-
-    def test_skill_id_bonus(self) -> None:
-        from app.capabilities.templates.registry import TemplateRegistry
-
-        registry = TemplateRegistry()
-        registry.register(_make_template(id="dashboard", triggers=("dashboard",)))
-        registry.register(
-            _make_template(
-                id="analytics",
-                name="Analytics",
-                triggers=("analytics",),
-            )
-        )
-        selector = TemplateSelector()
-
-        result = selector.select("dashboard analytics", "vue_project", "dashboard", registry)
-        assert result is not None
-        assert result.id == "dashboard"
-
-    def test_highest_score_wins(self) -> None:
-        from app.capabilities.templates.registry import TemplateRegistry
-
-        registry = TemplateRegistry()
-        registry.register(_make_template(id="a", triggers=("dashboard",)))
-        registry.register(_make_template(id="b", name="B", triggers=("dashboard", "analytics")))
-        selector = TemplateSelector()
-
-        result = selector.select("dashboard analytics", "vue_project", None, registry)
-        assert result is not None
-        assert result.id == "b"
-
-    def test_same_score_alphabetical(self) -> None:
-        from app.capabilities.templates.registry import TemplateRegistry
-
-        registry = TemplateRegistry()
-        registry.register(_make_template(id="b-template", triggers=("dashboard",)))
-        registry.register(_make_template(id="a-template", name="A", triggers=("dashboard",)))
-        selector = TemplateSelector()
-
-        result = selector.select("dashboard", "vue_project", None, registry)
-        assert result is not None
-        assert result.id == "a-template"
 
     def test_empty_registry(self) -> None:
         from app.capabilities.templates.registry import TemplateRegistry
@@ -103,7 +58,7 @@ class TestTemplateSelector:
         registry = TemplateRegistry()
         selector = TemplateSelector()
 
-        result = selector.select("dashboard", "vue_project", None, registry)
+        result = selector.select("vue_project", registry)
         assert result is None
 
     def test_empty_code_gen_type_matches_all(self) -> None:
@@ -113,72 +68,40 @@ class TestTemplateSelector:
         registry.register(_make_template(code_gen_type=""))
         selector = TemplateSelector()
 
-        result = selector.select("dashboard", "vue_project", None, registry)
+        result = selector.select("vue_project", registry)
         assert result is not None
 
-    def test_recommended_template_ids_prefer_match(self) -> None:
+    def test_default_template_id_used(self) -> None:
         from app.capabilities.templates.registry import TemplateRegistry
 
         registry = TemplateRegistry()
         registry.register(_make_template(id="dashboard", code_gen_type="single_file"))
-        registry.register(
-            _make_template(
-                id="landing",
-                name="Landing",
-                triggers=("landing",),
-                code_gen_type="single_file",
-            )
-        )
+        registry.register(_make_template(id="landing", name="Landing", code_gen_type="vue_project"))
         selector = TemplateSelector()
 
-        result = selector.select(
-            "landing page",
-            "single_file",
-            None,
-            registry,
-            recommended_template_ids=("dashboard", "landing"),
-        )
+        result = selector.select("single_file", registry, default_template_id="dashboard")
         assert result is not None
         assert result.id == "dashboard"
 
-    def test_recommended_template_ids_skip_mismatched_code_gen_type(self) -> None:
+    def test_default_template_id_skip_mismatched_code_gen_type(self) -> None:
         from app.capabilities.templates.registry import TemplateRegistry
 
         registry = TemplateRegistry()
         registry.register(_make_template(id="dashboard", code_gen_type="vue_project"))
-        registry.register(
-            _make_template(
-                id="landing",
-                name="Landing",
-                triggers=("landing",),
-                code_gen_type="single_file",
-            )
-        )
+        registry.register(_make_template(id="landing", name="Landing", code_gen_type="single_file"))
         selector = TemplateSelector()
 
-        result = selector.select(
-            "landing page",
-            "single_file",
-            None,
-            registry,
-            recommended_template_ids=("dashboard", "landing"),
-        )
+        result = selector.select("single_file", registry, default_template_id="dashboard")
         assert result is not None
         assert result.id == "landing"
 
-    def test_recommended_template_ids_fallback_to_trigger_scoring(self) -> None:
+    def test_default_template_id_missing_falls_back(self) -> None:
         from app.capabilities.templates.registry import TemplateRegistry
 
         registry = TemplateRegistry()
         registry.register(_make_template(id="dashboard", code_gen_type="single_file"))
         selector = TemplateSelector()
 
-        result = selector.select(
-            "dashboard",
-            "single_file",
-            None,
-            registry,
-            recommended_template_ids=("missing",),
-        )
+        result = selector.select("single_file", registry, default_template_id="missing")
         assert result is not None
         assert result.id == "dashboard"

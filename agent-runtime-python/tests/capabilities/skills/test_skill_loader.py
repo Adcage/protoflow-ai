@@ -10,28 +10,6 @@ DASHBOARD_SKILL_MD = """\
 ---
 name: dashboard
 description: Dashboard screen.
-triggers:
-  - dashboard
-  - 后台
-  - 看板
-od:
-  mode: prototype
-  platform: desktop
-  scenario: operations
-  preview:
-    type: html
-    entry: index.html
-  design_system:
-    requires: true
-    sections: [color, typography, layout]
-  craft:
-    requires: [state-coverage, accessibility-baseline]
-ac:
-  when_to_use: "Use when generating a dashboard."
-  target_code_gen_types: ["single_file", "multi_file", "vue_project"]
-  related_templates: ["dashboard"]
-  recommended_seeds: ["vue-dashboard"]
-  output_contract: "single_html_file"
 ---
 
 # Dashboard Skill
@@ -54,41 +32,12 @@ class TestSkillLoader:
         assert isinstance(skill, SkillDefinition)
         assert skill.name == "dashboard"
         assert skill.description == "Dashboard screen."
-        assert "后台" in skill.triggers
-        assert "dashboard" in skill.triggers
-        assert skill.mode == "prototype"
-        assert skill.platform == "desktop"
-        assert skill.scenario == "operations"
-        assert skill.preview is not None
-        assert skill.preview.type == "html"
-        assert skill.preview.entry == "index.html"
-        assert skill.design_system.requires is True
-        assert "color" in skill.design_system.sections
-        assert "state-coverage" in skill.craft.requires
-        assert "accessibility-baseline" in skill.craft.requires
         assert "Build a dashboard" in skill.body
 
-    def test_load_skill_ac_extension_fields(self, tmp_path: Path):
-        skill_dir = tmp_path / "skills" / "dashboard"
-        skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text(DASHBOARD_SKILL_MD, encoding="utf-8")
-
-        config = AssetPathConfig(bundled_root=tmp_path)
-        loader = SkillLoader()
-        registry = loader.load(config)
-
-        skill = registry.get("dashboard")
-        assert isinstance(skill, SkillDefinition)
-        assert skill.when_to_use == "Use when generating a dashboard."
-        assert skill.target_code_gen_types == ("single_file", "multi_file", "vue_project")
-        assert skill.related_templates == ("dashboard",)
-        assert skill.recommended_seeds == ("vue-dashboard",)
-        assert skill.output_contract == "single_html_file"
-
-    def test_load_skips_invalid_skill(self, tmp_path: Path):
+    def test_load_skips_skill_without_name(self, tmp_path: Path):
         skill_dir = tmp_path / "skills" / "broken"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("---\nname: broken\n---\nBody", encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text("---\ndescription: no name\n---\nBody", encoding="utf-8")
 
         config = AssetPathConfig(bundled_root=tmp_path)
         loader = SkillLoader()
@@ -141,12 +90,6 @@ class TestSkillLoader:
 ---
 name: dashboard-custom
 description: Custom dashboard.
-triggers:
-  - dashboard
-od:
-  mode: prototype
-  platform: desktop
-  scenario: operations
 ---
 
 # Custom Dashboard
@@ -165,6 +108,31 @@ od:
         skill = registry.get("dashboard")
         assert skill.name == "dashboard-custom"
 
+    def test_load_scans_references(self, tmp_path: Path):
+        skill_dir = tmp_path / "skills" / "web-prototype"
+        refs_dir = skill_dir / "references"
+        refs_dir.mkdir(parents=True)
+        skill_md = """\
+---
+name: web-prototype
+description: Web prototype skill.
+---
+
+# Web Prototype Skill
+"""
+        (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+        (refs_dir / "layouts.md").write_text("# Layouts", encoding="utf-8")
+        (refs_dir / "checklist.md").write_text("# Checklist", encoding="utf-8")
+
+        config = AssetPathConfig(bundled_root=tmp_path)
+        loader = SkillLoader()
+        registry = loader.load(config)
+
+        skill = registry.get("web-prototype")
+        assert skill.references
+        assert "references/layouts.md" in skill.references
+        assert "references/checklist.md" in skill.references
+
 
 class TestSkillRegistry:
     def test_all_returns_registered_skills(self):
@@ -173,13 +141,6 @@ class TestSkillRegistry:
             id="test",
             name="Test",
             description="Test skill",
-            triggers=("test",),
-            mode="prototype",
-            platform="desktop",
-            scenario="test",
-            preview=None,
-            design_system=SkillDefinition.__dataclass_fields__["design_system"].default,
-            craft=SkillDefinition.__dataclass_fields__["craft"].default,
             body="Body",
             source_path=Path("/test"),
         )

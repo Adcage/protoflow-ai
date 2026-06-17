@@ -13,14 +13,10 @@ from app.capabilities.design_systems.types import DesignSystemDefinition, Design
 from app.capabilities.seeds.registry import SeedRegistry
 from app.capabilities.seeds.types import SeedDefinition
 from app.capabilities.skills.registry import SkillRegistry
-from app.capabilities.skills.types import (
-    SkillCraftRequirement,
-    SkillDefinition,
-    SkillDesignSystemRequirement,
-    SkillPreview,
-)
+from app.capabilities.skills.types import SkillDefinition
 from app.capabilities.templates.registry import TemplateRegistry
 from app.capabilities.templates.types import TemplateDefinition
+from app.capabilities.common.capability_selection import CapabilitySelection
 from app.nodes.select_capabilities import SelectCapabilitiesNode
 from app.runtime.context import CodeGenType, ExecutionContext, RunMode
 from app.runtime.event_bus import EventBus
@@ -34,20 +30,10 @@ def _make_asset_index_with_recommended() -> AssetIndex:
     skill_reg.register(
         SkillDefinition(
             id="dashboard",
-            name="dashboard",
+            name="Dashboard",
             description="Dashboard skill",
-            triggers=("dashboard", "后台"),
-            mode="prototype",
-            platform="desktop",
-            scenario="operations",
-            preview=SkillPreview(type="html", entry="index.html"),
-            design_system=SkillDesignSystemRequirement(requires=True),
-            craft=SkillCraftRequirement(requires=("state-coverage",)),
             body="Build a dashboard.",
             source_path=Path("."),
-            target_code_gen_types=("single_file", "multi_file", "vue_project"),
-            related_templates=("dashboard",),
-            recommended_seeds=("vue-dashboard",),
         )
     )
 
@@ -72,7 +58,6 @@ def _make_asset_index_with_recommended() -> AssetIndex:
             name="Vue Basic",
             description="Basic Vue seed",
             code_gen_type="vue_project",
-            triggers=("vue",),
             entry="src/App.vue",
             files_dir=Path("/tmp/seed-files"),
             copy_mode="missing-only",
@@ -85,7 +70,6 @@ def _make_asset_index_with_recommended() -> AssetIndex:
             name="Vue Dashboard",
             description="Vue dashboard seed",
             code_gen_type="vue_project",
-            triggers=("dashboard",),
             entry="src/App.vue",
             files_dir=Path("/tmp/dashboard-seed-files"),
             copy_mode="missing-only",
@@ -100,7 +84,6 @@ def _make_asset_index_with_recommended() -> AssetIndex:
             name="Dashboard",
             description="Dashboard template",
             code_gen_type="vue_project",
-            triggers=("dashboard",),
             entry="src/App.vue",
             max_prompt_files=1,
             files=(Path("files/src/App.vue"),),
@@ -190,7 +173,7 @@ class TestSelectCapabilitiesNode:
         assert result.capability_selection is not None
         assert result.selection_source == "selector"
         assert result.capability_selection.skill_ids == ("dashboard",)
-        assert result.capability_selection.seed_id == "vue-dashboard"
+        assert result.capability_selection.seed_id == "vue-basic"
         assert result.capability_selection.template_ids == ("dashboard",)
         assert result.capability_selection.design_system_id == "ant"
         assert "anti-ai-slop" in result.capability_selection.craft_ids
@@ -231,3 +214,126 @@ class TestSelectCapabilitiesNode:
 
         assert any(e.event.event_type == RuntimeEventType.CAPABILITY_SELECTED for e in events)
         assert any(e.event.event_type == RuntimeEventType.NODE_COMPLETED for e in events)
+
+    @pytest.mark.asyncio
+    async def test_select_capabilities_uses_planner_selection_when_available(self, tmp_path: Path):
+        index = _make_asset_index_with_recommended()
+
+        mock_manager = MagicMock(spec=AssetManager)
+        mock_manager.get_index.return_value = index
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        services = _make_services(asset_manager=mock_manager)
+        state = ExecutionState()
+        state.capability_selection = CapabilitySelection(
+            skill_ids=("dashboard",),
+            seed_id="vue-basic",
+            template_ids=("dashboard",),
+            design_system_id="ant",
+            craft_ids=("anti-ai-slop", "state-coverage"),
+            project_mode="vue_project",
+            selection_source="planner",
+        )
+        context = _make_context(workspace_path=str(workspace))
+
+        node = SelectCapabilitiesNode()
+        result = await node.run(context, state, services)
+
+        assert result.selection_source == "planner"
+        assert result.selected_skill_id == "dashboard"
+        assert result.selected_seed_id == "vue-basic"
+        assert result.selected_template_id == "dashboard"
+        assert result.selected_design_system_id == "ant"
+        assert "anti-ai-slop" in result.selected_craft_ids
+        assert "state-coverage" in result.selected_craft_ids
+        assert result.selected_capabilities.skill.id == "dashboard"
+        assert result.selected_capabilities.seed.id == "vue-basic"
+
+    @pytest.mark.asyncio
+    async def test_select_capabilities_uses_fallback_selection(self, tmp_path: Path):
+        index = _make_asset_index_with_recommended()
+
+        mock_manager = MagicMock(spec=AssetManager)
+        mock_manager.get_index.return_value = index
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        services = _make_services(asset_manager=mock_manager)
+        state = ExecutionState()
+        state.capability_selection = CapabilitySelection(
+            skill_ids=("dashboard",),
+            seed_id="vue-basic",
+            design_system_id="ant",
+            project_mode="vue_project",
+            selection_source="fallback",
+        )
+        context = _make_context(workspace_path=str(workspace))
+
+        node = SelectCapabilitiesNode()
+        result = await node.run(context, state, services)
+
+        assert result.selection_source == "fallback"
+        assert result.selected_skill_id == "dashboard"
+
+    @pytest.mark.asyncio
+    async def test_select_capabilities_skips_planner_selection_for_selector_source(
+        self, tmp_path: Path
+    ):
+        index = _make_asset_index_with_recommended()
+
+        mock_manager = MagicMock(spec=AssetManager)
+        mock_manager.get_index.return_value = index
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        services = _make_services(asset_manager=mock_manager)
+        state = ExecutionState()
+        state.capability_selection = CapabilitySelection(
+            skill_ids=("dashboard",),
+            selection_source="selector",
+        )
+        context = _make_context(workspace_path=str(workspace))
+
+        node = SelectCapabilitiesNode()
+        result = await node.run(context, state, services)
+
+        assert result.selection_source == "selector"
+        assert result.selected_skill_id == "dashboard"
+
+    @pytest.mark.asyncio
+    async def test_select_capabilities_planner_selection_skips_missing_assets(self, tmp_path: Path):
+        index = _make_asset_index_with_recommended()
+
+        mock_manager = MagicMock(spec=AssetManager)
+        mock_manager.get_index.return_value = index
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        services = _make_services(asset_manager=mock_manager)
+        state = ExecutionState()
+        state.capability_selection = CapabilitySelection(
+            skill_ids=("dashboard", "nonexistent-skill"),
+            seed_id="nonexistent-seed",
+            template_ids=("nonexistent-template",),
+            design_system_id="nonexistent-ds",
+            craft_ids=("anti-ai-slop", "nonexistent-craft"),
+            project_mode="vue_project",
+            selection_source="planner",
+        )
+        context = _make_context(workspace_path=str(workspace))
+
+        node = SelectCapabilitiesNode()
+        result = await node.run(context, state, services)
+
+        assert result.selection_source == "planner"
+        assert result.selected_skill_id == "dashboard"
+        assert result.selected_seed_id == ""
+        assert result.selected_template_id == ""
+        assert result.selected_design_system_id == ""
+        assert "anti-ai-slop" in result.selected_craft_ids
+        assert "nonexistent-craft" not in result.selected_craft_ids

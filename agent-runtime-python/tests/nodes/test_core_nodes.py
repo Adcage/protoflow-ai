@@ -299,3 +299,49 @@ class TestFinalizeNode:
         assert "Template: dashboard" in result.internal_summary
         assert "DesignSystem: ant" in result.internal_summary
         assert "Craft: anti-ai-slop,state-coverage" in result.internal_summary
+
+    @pytest.mark.asyncio
+    async def test_finalize_returns_clarification_summary(self):
+        node = FinalizeNode()
+        ctx = _make_context()
+        state = ExecutionState(
+            workflow_route="clarification",
+            clarification_questions=[
+                {
+                    "id": "q1",
+                    "question": "需要偏向官网还是后台？",
+                    "reason": "决定项目模式",
+                    "required": True,
+                    "options": ["官网", "后台"],
+                },
+            ],
+        )
+        mock_platform = AsyncMock()
+        services = _make_services(platform_client=mock_platform)
+        result = await node.run(ctx, state, services)
+        assert "<planning type=\"clarification\">" in result.final_summary
+        assert "需要偏向官网还是后台" in result.final_summary
+        call_args = mock_platform.complete_agent_run.call_args
+        assert call_args.kwargs["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_finalize_returns_plan_confirmation_summary(self):
+        node = FinalizeNode()
+        ctx = _make_context()
+        state = ExecutionState(
+            workflow_route="plan_confirmation",
+            implementation_outline={
+                "title": "后台看板实施计划",
+                "summary": "先搭建布局，再生成数据模块。",
+                "steps": ["搭建侧边栏", "生成指标卡", "生成图表"],
+                "risks": [],
+                "assumptions": [],
+            },
+        )
+        mock_platform = AsyncMock()
+        services = _make_services(platform_client=mock_platform)
+        result = await node.run(ctx, state, services)
+        assert "<planning type=\"plan_confirmation\">" in result.final_summary
+        assert "后台看板实施计划" in result.final_summary
+        call_args = mock_platform.complete_agent_run.call_args
+        assert call_args.kwargs["success"] is True

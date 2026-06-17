@@ -108,3 +108,47 @@ class TestFileTools:
             result = await tools.read_dir("newdir")
             assert result == ""
             assert os.path.isdir(os.path.join(tmpdir, "newdir"))
+
+
+class TestSkillScopeReading:
+    @pytest.mark.asyncio
+    async def test_read_file_skill_scope(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory() as skill_dir:
+                ref_content = "skill reference content"
+                ref_path = os.path.join(skill_dir, "references", "layout.md")
+                os.makedirs(os.path.dirname(ref_path), exist_ok=True)
+                with open(ref_path, "w", encoding="utf-8") as f:
+                    f.write(ref_content)
+
+                ws = Workspace(tmpdir)
+                tools = FileTools(ws, skill_dir=skill_dir)
+                result = await tools.read_file("references/layout.md", scope="skill")
+                assert ref_content in result
+
+    @pytest.mark.asyncio
+    async def test_read_file_skill_scope_no_skill_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ws = Workspace(tmpdir)
+            tools = FileTools(ws)
+            with pytest.raises(AgentRuntimeError) as exc_info:
+                await tools.read_file("references/layout.md", scope="skill")
+            assert exc_info.value.code == 62009
+
+    @pytest.mark.asyncio
+    async def test_read_file_skill_scope_path_traversal(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory() as skill_dir:
+                ws = Workspace(tmpdir)
+                tools = FileTools(ws, skill_dir=skill_dir)
+                with pytest.raises(AgentRuntimeError, match="路径穿越"):
+                    await tools.read_file("../../../etc/passwd", scope="skill")
+
+    @pytest.mark.asyncio
+    async def test_read_file_skill_scope_not_found(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory() as skill_dir:
+                ws = Workspace(tmpdir)
+                tools = FileTools(ws, skill_dir=skill_dir)
+                with pytest.raises(AgentRuntimeError, match="文件不存在"):
+                    await tools.read_file("nonexistent.md", scope="skill")

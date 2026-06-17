@@ -20,7 +20,6 @@ def _create_template_json(
     name: str = "Analytics Dashboard",
     description: str = "Dashboard layout with sidebar.",
     code_gen_type: str = "vue_project",
-    triggers: list[str] | None = None,
     entry: str = "files/src/App.vue",
     max_prompt_files: int = 3,
     files: list[str] | None = None,
@@ -33,7 +32,6 @@ def _create_template_json(
         "name": name,
         "description": description,
         "codeGenType": code_gen_type,
-        "triggers": triggers or ["dashboard", "analytics", "后台"],
         "entry": entry,
         "maxPromptFiles": max_prompt_files,
         "files": files or ["files/src/App.vue"],
@@ -58,8 +56,6 @@ class TestTemplateLoader:
         template = registry.get("dashboard-analytics")
         assert template.name == "Analytics Dashboard"
         assert template.code_gen_type == "vue_project"
-        assert "dashboard" in template.triggers
-        assert "后台" in template.triggers
         assert template.max_prompt_files == 3
         assert len(template.files) == 1
 
@@ -128,7 +124,6 @@ class TestTemplateLoader:
 
         t = registry.get("minimal")
         assert t.code_gen_type == ""
-        assert t.triggers == ()
         assert t.max_prompt_files == 3
 
     def test_higher_priority_root_overrides(self, tmp_path: Path) -> None:
@@ -163,7 +158,6 @@ class TestTemplateLoader:
             "description": "Web prototype reference",
             "kind": "html-reference",
             "codeGenType": "single_file",
-            "triggers": ["prototype"],
             "entry": "index.html",
             "maxPromptFiles": 1,
             "references": ["references/layout.md"],

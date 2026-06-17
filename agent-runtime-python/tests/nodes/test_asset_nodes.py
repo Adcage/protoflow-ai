@@ -12,12 +12,7 @@ from app.capabilities.design_systems.types import DesignSystemDefinition, Design
 from app.capabilities.seeds.registry import SeedRegistry
 from app.capabilities.seeds.types import SeedDefinition
 from app.capabilities.skills.registry import SkillRegistry
-from app.capabilities.skills.types import (
-    SkillCraftRequirement,
-    SkillDefinition,
-    SkillDesignSystemRequirement,
-    SkillPreview,
-)
+from app.capabilities.skills.types import SkillDefinition
 from app.capabilities.templates.registry import TemplateRegistry
 from app.nodes.load_assets import LoadAssetsNode
 from app.nodes.select_capabilities import SelectCapabilitiesNode
@@ -42,15 +37,8 @@ def _make_asset_index_with_data() -> AssetIndex:
     skill_reg.register(
         SkillDefinition(
             id="dashboard",
-            name="dashboard",
+            name="Dashboard",
             description="Dashboard skill",
-            triggers=("dashboard", "后台"),
-            mode="prototype",
-            platform="desktop",
-            scenario="operations",
-            preview=SkillPreview(type="html", entry="index.html"),
-            design_system=SkillDesignSystemRequirement(requires=True),
-            craft=SkillCraftRequirement(requires=("state-coverage",)),
             body="Build a dashboard.",
             source_path=Path("."),
         )
@@ -77,7 +65,6 @@ def _make_asset_index_with_data() -> AssetIndex:
             name="Vue Basic",
             description="Basic Vue seed",
             code_gen_type="vue_project",
-            triggers=("vue",),
             entry="src/App.vue",
             files_dir=Path("/tmp/seed-files"),
             copy_mode="missing-only",
@@ -154,7 +141,7 @@ class TestLoadAssetsNode:
         skill_dir = skills_dir / "dashboard"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: dashboard\ndescription: test\ntriggers:\n  - dashboard\nod:\n  mode: prototype\n  platform: desktop\n  scenario: operations\n---\n\n# Dashboard\n",
+            "---\nname: dashboard\ndescription: test\n---\n\n# Dashboard\n",
             encoding="utf-8",
         )
         (bundled / "seeds").mkdir()
@@ -188,6 +175,61 @@ class TestLoadAssetsNode:
             await node.run(context, state, services)
 
 
+class TestLoadAssetsNodeAssetSummaries:
+    @pytest.mark.asyncio
+    async def test_load_assets_generates_asset_summaries(self):
+        index = _make_asset_index_with_data()
+
+        mock_manager = MagicMock(spec=AssetManager)
+        mock_manager.get_index.return_value = index
+
+        services = _make_services(asset_manager=mock_manager)
+        state = ExecutionState()
+        context = _make_context()
+
+        node = LoadAssetsNode()
+        result = await node.run(context, state, services)
+
+        assert len(result.asset_summaries) > 0
+        summary_ids = [s["id"] for s in result.asset_summaries]
+        assert "dashboard" in summary_ids
+        assert "vue-basic" in summary_ids
+        assert "default" in summary_ids
+        assert "anti-ai-slop" in summary_ids
+        assert "state-coverage" in summary_ids
+
+        dashboard = next(s for s in result.asset_summaries if s["id"] == "dashboard")
+        assert dashboard["kind"] == "skill"
+        assert dashboard["name"] == "Dashboard"
+
+        vue_basic = next(s for s in result.asset_summaries if s["id"] == "vue-basic")
+        assert vue_basic["kind"] == "seed"
+        assert vue_basic["code_gen_types"] == ("vue_project",)
+
+        default_ds = next(s for s in result.asset_summaries if s["id"] == "default")
+        assert default_ds["kind"] == "design_system"
+        assert default_ds["scenarios"] == ("product",)
+
+        anti_slop = next(s for s in result.asset_summaries if s["id"] == "anti-ai-slop")
+        assert anti_slop["kind"] == "craft"
+
+    @pytest.mark.asyncio
+    async def test_load_assets_empty_summaries_when_no_assets(self):
+        index = _make_empty_asset_index()
+
+        mock_manager = MagicMock(spec=AssetManager)
+        mock_manager.get_index.return_value = index
+
+        services = _make_services(asset_manager=mock_manager)
+        state = ExecutionState()
+        context = _make_context()
+
+        node = LoadAssetsNode()
+        result = await node.run(context, state, services)
+
+        assert result.asset_summaries == []
+
+
 class TestSelectCapabilitiesNode:
     @pytest.mark.asyncio
     async def test_selects_skill_and_capabilities(self, tmp_path: Path):
@@ -214,22 +256,27 @@ class TestSelectCapabilitiesNode:
         assert result.selected_capabilities.skill.id == "dashboard"
 
     @pytest.mark.asyncio
-    async def test_no_skill_selected_when_no_trigger_match(self, tmp_path: Path):
+    async def test_seeds_only_for_vue_project(self, tmp_path: Path):
         index = _make_asset_index_with_data()
 
         mock_manager = MagicMock(spec=AssetManager)
         mock_manager.get_index.return_value = index
 
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
         services = _make_services(asset_manager=mock_manager)
         state = ExecutionState()
-        context = _make_context(prompt="生成一个完全无关的东西")
+        context = _make_context(
+            prompt="生成单文件页面",
+            code_gen_type=CodeGenType.SINGLE_FILE,
+            workspace_path=str(workspace),
+        )
 
         node = SelectCapabilitiesNode()
         result = await node.run(context, state, services)
 
-        assert result.selected_skill_id == ""
-        assert result.selected_capabilities is not None
-        assert result.selected_capabilities.skill is None
+        assert result.selected_seed_id == ""
 
     @pytest.mark.asyncio
     async def test_modify_mode_no_seed(self, tmp_path: Path):
@@ -252,7 +299,7 @@ class TestSelectCapabilitiesNode:
         assert result.selected_capabilities.seed is None
 
     @pytest.mark.asyncio
-    async def test_craft_ids_from_skill_and_design_system(self, tmp_path: Path):
+    async def test_craft_ids_from_design_system_suggested(self, tmp_path: Path):
         index = _make_asset_index_with_data()
 
         mock_manager = MagicMock(spec=AssetManager)

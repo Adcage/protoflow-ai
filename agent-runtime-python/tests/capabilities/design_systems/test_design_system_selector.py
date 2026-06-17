@@ -3,11 +3,6 @@ from pathlib import Path
 from app.capabilities.design_systems.registry import DesignSystemRegistry
 from app.capabilities.design_systems.selector import DesignSystemSelector
 from app.capabilities.design_systems.types import DesignSystemDefinition, DesignSystemFiles
-from app.capabilities.skills.types import (
-    SkillDefinition,
-    SkillCraftRequirement,
-    SkillDesignSystemRequirement,
-)
 
 
 def _make_ds(
@@ -28,25 +23,6 @@ def _make_ds(
     )
 
 
-def _make_skill(
-    design_system_requires: bool = False,
-) -> SkillDefinition:
-    return SkillDefinition(
-        id="test-skill",
-        name="Test Skill",
-        description="Test",
-        triggers=("test",),
-        mode="prototype",
-        platform="desktop",
-        scenario="test",
-        preview=None,
-        design_system=SkillDesignSystemRequirement(requires=design_system_requires),
-        craft=SkillCraftRequirement(),
-        body="# Test",
-        source_path=Path("/skills/test/SKILL.md"),
-    )
-
-
 class TestDesignSystemSelector:
     def test_selects_default_when_available(self):
         registry = DesignSystemRegistry()
@@ -54,7 +30,7 @@ class TestDesignSystemSelector:
         registry.register(_make_ds("ant", "Ant"))
 
         selector = DesignSystemSelector()
-        result = selector.select("生成一个页面", "vue_project", None, registry)
+        result = selector.select("生成一个页面", "vue_project", registry, default_design_system_id="default")
 
         assert result is not None
         assert result.id == "default"
@@ -65,7 +41,7 @@ class TestDesignSystemSelector:
         registry.register(_make_ds("ant", "Ant"))
 
         selector = DesignSystemSelector()
-        result = selector.select("使用 ant 风格生成", "vue_project", None, registry)
+        result = selector.select("使用 ant 风格生成", "vue_project", registry)
 
         assert result is not None
         assert result.id == "ant"
@@ -76,7 +52,7 @@ class TestDesignSystemSelector:
         registry.register(_make_ds("ant", "Ant"))
 
         selector = DesignSystemSelector()
-        result = selector.select("使用 antd 组件风格", "vue_project", None, registry)
+        result = selector.select("使用 antd 组件风格", "vue_project", registry)
 
         assert result is not None
         assert result.id == "ant"
@@ -86,7 +62,7 @@ class TestDesignSystemSelector:
         registry.register(_make_ds("default", "Default"))
 
         selector = DesignSystemSelector()
-        result = selector.select("使用 material 风格", "vue_project", None, registry)
+        result = selector.select("使用 material 风格", "vue_project", registry)
 
         assert result is not None
         assert result.id == "default"
@@ -97,7 +73,7 @@ class TestDesignSystemSelector:
         registry.register(_make_ds("alpha", "Alpha"))
 
         selector = DesignSystemSelector()
-        result = selector.select("生成一个页面", "vue_project", None, registry)
+        result = selector.select("生成一个页面", "vue_project", registry)
 
         assert result is not None
         assert result.id == "alpha"
@@ -106,27 +82,27 @@ class TestDesignSystemSelector:
         registry = DesignSystemRegistry()
 
         selector = DesignSystemSelector()
-        result = selector.select("生成一个页面", "vue_project", None, registry)
+        result = selector.select("生成一个页面", "vue_project", registry)
 
         assert result is None
 
-    def test_skill_requiring_design_system_still_selects_default(self):
+    def test_default_design_system_id_used(self):
         registry = DesignSystemRegistry()
         registry.register(_make_ds("default", "Default"))
+        registry.register(_make_ds("ant", "Ant"))
 
-        skill = _make_skill(design_system_requires=True)
         selector = DesignSystemSelector()
-        result = selector.select("生成一个页面", "vue_project", skill, registry)
+        result = selector.select("生成一个页面", "vue_project", registry, default_design_system_id="ant")
 
         assert result is not None
-        assert result.id == "default"
+        assert result.id == "ant"
 
-    def test_no_skill_vue_project_still_gets_default(self):
+    def test_default_id_not_found_falls_back(self):
         registry = DesignSystemRegistry()
         registry.register(_make_ds("default", "Default"))
 
         selector = DesignSystemSelector()
-        result = selector.select("生成一个页面", "vue_project", None, registry)
+        result = selector.select("生成一个页面", "vue_project", registry, default_design_system_id="nonexistent")
 
         assert result is not None
         assert result.id == "default"

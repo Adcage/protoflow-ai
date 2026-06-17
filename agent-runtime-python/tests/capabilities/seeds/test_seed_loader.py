@@ -13,7 +13,6 @@ VUE_BASIC_SEED_JSON = {
     "name": "Vue Basic Seed",
     "description": "Vue 3 basic starter with App.vue and src structure.",
     "codeGenType": "vue_project",
-    "triggers": ["vue", "前端", "web应用"],
     "entry": "src/App.vue",
     "filesDir": "files",
     "copyMode": "missing-only",
@@ -41,8 +40,6 @@ class TestSeedLoader:
         assert seed.name == "Vue Basic Seed"
         assert seed.description == "Vue 3 basic starter with App.vue and src structure."
         assert seed.code_gen_type == "vue_project"
-        assert "vue" in seed.triggers
-        assert "前端" in seed.triggers
         assert seed.entry == "src/App.vue"
         assert seed.files_dir == seed_dir / "files"
         assert seed.copy_mode == "missing-only"
@@ -174,7 +171,6 @@ class TestSeedRegistry:
             name="Test",
             description="Test seed",
             code_gen_type="vue_project",
-            triggers=("vue",),
             entry="src/App.vue",
             files_dir=Path("/files"),
             copy_mode="missing-only",
@@ -196,7 +192,6 @@ class TestSeedRegistry:
             name="Dup",
             description="",
             code_gen_type="vue_project",
-            triggers=(),
             entry="",
             files_dir=Path("/files"),
             copy_mode="missing-only",

@@ -111,6 +111,8 @@ class TestProtoEventMapper:
             RuntimeEventType.NODE_COMPLETED,
             RuntimeEventType.CAPABILITY_SELECTED,
             RuntimeEventType.MODEL_SELECTED,
+            RuntimeEventType.CLARIFICATION_REQUIRED,
+            RuntimeEventType.MODE_SWITCHED,
         ],
     )
     def test_internal_events_not_mapped(self, event_type):

@@ -3,11 +3,7 @@ from pathlib import Path
 from app.capabilities.common.capability_selection import CapabilitySelection
 from app.capabilities.common.loader_result import SelectedCapabilities
 from app.capabilities.skills.prompt_module import SelectedSkillModule
-from app.capabilities.skills.types import (
-    SkillCraftRequirement,
-    SkillDefinition,
-    SkillDesignSystemRequirement,
-)
+from app.capabilities.skills.types import SkillDefinition
 
 
 def _make_state(skill: SkillDefinition | None):
@@ -21,54 +17,19 @@ def _make_state(skill: SkillDefinition | None):
     return state
 
 
-def test_skill_prompt_rewrites_open_design_artifact_contract():
+def test_skill_prompt_renders_skill_name_and_body():
     skill = SkillDefinition(
         id="dashboard",
         name="dashboard",
         description="Dashboard screen.",
-        triggers=("dashboard",),
-        mode="prototype",
-        platform="desktop",
-        scenario="operations",
-        preview=None,
-        design_system=SkillDesignSystemRequirement(requires=True),
-        craft=SkillCraftRequirement(requires=("state-coverage",)),
-        body="Emit between <artifact> tags and write one self-contained HTML document.",
+        body="Build a real dashboard with complete functionality.",
         source_path=Path("SKILL.md"),
-        output_contract="single_html_file",
     )
 
     rendered = SelectedSkillModule().render(context=None, state=_make_state(skill))
 
-    assert "Use file tools to write real project files" in rendered
-    assert "<artifact>" not in rendered
-    assert "self-contained HTML" not in rendered
-    assert "### Project Output Contract" in rendered
-
-
-def test_skill_prompt_appends_output_contract_with_expected_contract():
-    skill = SkillDefinition(
-        id="web-prototype",
-        name="web-prototype",
-        description="Web prototype.",
-        triggers=("prototype",),
-        mode="prototype",
-        platform="desktop",
-        scenario="design",
-        preview=None,
-        design_system=SkillDesignSystemRequirement(requires=True),
-        craft=SkillCraftRequirement(requires=("typography", "color")),
-        body="Build a prototype.",
-        source_path=Path("SKILL.md"),
-        output_contract="single_html_file",
-    )
-
-    rendered = SelectedSkillModule().render(context=None, state=_make_state(skill))
-
-    assert "### Project Output Contract" in rendered
-    assert "Expected output contract: single_html_file" in rendered
-    assert "write_file" in rendered
-    assert "loading, empty, error, and normal states" in rendered
+    assert "## Selected Skill: dashboard" in rendered
+    assert "Build a real dashboard with complete functionality." in rendered
 
 
 def test_skill_prompt_enabled_only_when_skill_present():
@@ -78,13 +39,6 @@ def test_skill_prompt_enabled_only_when_skill_present():
         id="dashboard",
         name="dashboard",
         description="Dashboard screen.",
-        triggers=("dashboard",),
-        mode="prototype",
-        platform="desktop",
-        scenario="operations",
-        preview=None,
-        design_system=SkillDesignSystemRequirement(requires=True),
-        craft=SkillCraftRequirement(requires=("state-coverage",)),
         body="Build a dashboard.",
         source_path=Path("SKILL.md"),
     )
@@ -102,23 +56,34 @@ def test_skill_prompt_returns_empty_when_no_selected_capabilities():
     assert rendered == ""
 
 
-def test_skill_prompt_replaces_single_self_contained_html():
+def test_skill_prompt_renders_resource_list():
     skill = SkillDefinition(
-        id="landing-page",
-        name="landing-page",
-        description="Landing page.",
-        triggers=("landing",),
-        mode="prototype",
-        platform="desktop",
-        scenario="marketing",
-        preview=None,
-        design_system=SkillDesignSystemRequirement(requires=True),
-        craft=SkillCraftRequirement(requires=("typography", "color", "anti-ai-slop")),
-        body="Produce a single, self-contained HTML landing page between <artifact> tags.",
-        source_path=Path("SKILL.md"),
+        id="web-prototype",
+        name="web-prototype",
+        description="Web prototype skill.",
+        body="Build a real web page.",
+        source_path=Path("/skills/web-prototype/SKILL.md"),
+        references=("references/layouts.md", "references/checklist.md"),
     )
 
     rendered = SelectedSkillModule().render(context=None, state=_make_state(skill))
 
-    assert "project files" in rendered
-    assert "<artifact>" not in rendered
+    assert "## Skill 可用资源" in rendered
+    assert 'read_file(path, scope="skill")' in rendered
+    assert "references/layouts.md" in rendered
+    assert "references/checklist.md" in rendered
+
+
+def test_skill_prompt_no_resource_section_when_empty_references():
+    skill = SkillDefinition(
+        id="dashboard",
+        name="dashboard",
+        description="Dashboard screen.",
+        body="Build a dashboard.",
+        source_path=Path("/skills/dashboard/SKILL.md"),
+        references=(),
+    )
+
+    rendered = SelectedSkillModule().render(context=None, state=_make_state(skill))
+
+    assert "## Skill 可用资源" not in rendered

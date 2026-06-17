@@ -15,7 +15,6 @@ def _make_seed(
         name="Test Seed",
         description="Test seed",
         code_gen_type="vue_project",
-        triggers=("vue",),
         entry="src/App.vue",
         files_dir=files_dir or Path("/seeds/test/files"),
         copy_mode=copy_mode,
