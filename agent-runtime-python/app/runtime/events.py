@@ -13,6 +13,10 @@ class RuntimeEventType(str, Enum):
     CAPABILITY_SELECTED = "capability_selected"
     MODEL_SELECTED = "model_selected"
     RUNTIME_ERROR = "runtime_error"
+    CLARIFICATION_REQUIRED = "clarification_required"
+    MODE_SWITCHED = "mode_switched"
+    AGENT_LOOP_ITERATION = "agent_loop_iteration"
+    AGENT_LOOP_COMPLETED = "agent_loop_completed"
     DONE = "done"
 
 

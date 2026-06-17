@@ -32,6 +32,8 @@ class CollectArtifactsNode(RuntimeNode):
         seed_entry = ""
         source_skill_id = state.selected_skill_id
         source_skill_ids: list[str] = []
+        seed_entry = ""
+        source_skill_id = state.selected_skill_id
         source_seed_id = state.selected_seed_id
         source_template_id = state.selected_template_id
         source_template_ids: list[str] = []
@@ -42,8 +44,6 @@ class CollectArtifactsNode(RuntimeNode):
 
         if state.selected_capabilities is not None:
             cap: SelectedCapabilities = state.selected_capabilities
-            if cap.skill is not None and cap.skill.preview is not None:
-                skill_preview_entry = cap.skill.preview.entry
             if cap.seed is not None:
                 seed_entry = cap.seed.entry
 

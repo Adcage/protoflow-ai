@@ -1,3 +1,4 @@
+import json
 import logging
 
 from app.nodes.base import NodeMetadata, RuntimeNode
@@ -18,38 +19,68 @@ class FinalizeNode(RuntimeNode):
         state: ExecutionState,
         services: RuntimeServices,
     ) -> ExecutionState:
-        has_error_fail = any(
-            r.get("status") == "fail" and r.get("severity") == "error"
-            for r in state.quality_results
-        )
-        has_warnings = any(
-            r.get("status") in ("warn", "fail") and r.get("severity") == "warning"
-            for r in state.quality_results
-        )
-
-        success = len(state.errors) == 0 and not has_error_fail
-        summary_parts = []
-        if state.model_response_text:
-            summary_parts.append(f"模型输出 {len(state.model_response_text)} 字")
-        if state.files_touched:
-            summary_parts.append(f"写入 {len(state.files_touched)} 个文件")
-        if state.executed_tool_calls:
-            summary_parts.append(f"执行 {len(state.executed_tool_calls)} 次工具调用")
-
-        if state.quality_results:
-            pass_count = sum(1 for r in state.quality_results if r.get("status") == "pass")
-            warn_count = sum(1 for r in state.quality_results if r.get("status") == "warn")
-            fail_count = sum(1 for r in state.quality_results if r.get("status") == "fail")
-            summary_parts.append(
-                f"质量检查: {pass_count} pass, {warn_count} warn, {fail_count} fail"
+        if state.workflow_route == "clarification":
+            planning_json = json.dumps(
+                {"questions": state.clarification_questions}, ensure_ascii=False
             )
-            if has_warnings and not has_error_fail:
-                summary_parts.append("存在质量警告")
+            state.final_summary = (
+                f"需要补充以下信息后再生成：\n<planning type=\"clarification\">{planning_json}</planning>"
+            )
+            success = True
+        elif state.workflow_route == "plan_confirmation":
+            outline = state.implementation_outline or {}
+            planning_json = json.dumps(
+                {
+                    "outline": {
+                        "title": outline.get("title", ""),
+                        "summary": outline.get("summary", ""),
+                        "steps": outline.get("steps", []),
+                        "risks": outline.get("risks", []),
+                        "assumptions": outline.get("assumptions", []),
+                    }
+                },
+                ensure_ascii=False,
+            )
+            state.final_summary = (
+                f"已生成实施计划，请确认是否按此方案执行：\n<planning type=\"plan_confirmation\">{planning_json}</planning>"
+            )
+            success = True
+        elif state.workflow_route == "route_only":
+            state.final_summary = f"路由完成：{state.planning_decision}"
+            success = True
+        else:
+            has_error_fail = any(
+                r.get("status") == "fail" and r.get("severity") == "error"
+                for r in state.quality_results
+            )
+            has_warnings = any(
+                r.get("status") in ("warn", "fail") and r.get("severity") == "warning"
+                for r in state.quality_results
+            )
 
-        if state.errors:
-            summary_parts.append(f"发生 {len(state.errors)} 个错误")
+            success = len(state.errors) == 0 and not has_error_fail
+            summary_parts = []
+            if state.model_response_text:
+                summary_parts.append(f"模型输出 {len(state.model_response_text)} 字")
+            if state.files_touched:
+                summary_parts.append(f"写入 {len(state.files_touched)} 个文件")
+            if state.executed_tool_calls:
+                summary_parts.append(f"执行 {len(state.executed_tool_calls)} 次工具调用")
 
-        state.final_summary = "，".join(summary_parts) if summary_parts else "无操作"
+            if state.quality_results:
+                pass_count = sum(1 for r in state.quality_results if r.get("status") == "pass")
+                warn_count = sum(1 for r in state.quality_results if r.get("status") == "warn")
+                fail_count = sum(1 for r in state.quality_results if r.get("status") == "fail")
+                summary_parts.append(
+                    f"质量检查: {pass_count} pass, {warn_count} warn, {fail_count} fail"
+                )
+                if has_warnings and not has_error_fail:
+                    summary_parts.append("存在质量警告")
+
+            if state.errors:
+                summary_parts.append(f"发生 {len(state.errors)} 个错误")
+
+            state.final_summary = "，".join(summary_parts) if summary_parts else "无操作"
 
         internal_parts = []
         if state.artifact_manifest_path:

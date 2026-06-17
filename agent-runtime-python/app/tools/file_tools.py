@@ -34,11 +34,15 @@ class Workspace:
 
 
 class FileTools:
-    def __init__(self, workspace: Workspace) -> None:
+    def __init__(self, workspace: Workspace, skill_dir: str | None = None) -> None:
         self._workspace = workspace
+        self._skill_dir = os.path.abspath(skill_dir) if skill_dir else None
 
-    async def read_file(self, relative_path: str) -> str:
-        abs_path = self._workspace.resolve(relative_path)
+    async def read_file(self, relative_path: str, scope: str = "workspace") -> str:
+        if scope == "skill":
+            abs_path = self._resolve_in_skill(relative_path)
+        else:
+            abs_path = self._workspace.resolve(relative_path)
         if not os.path.exists(abs_path):
             raise AgentRuntimeError(
                 f"文件不存在: {relative_path}", code=AgentErrorCode.TOOL_CALL_FAILED
@@ -50,6 +54,24 @@ class FileTools:
             raise AgentRuntimeError(
                 f"读取文件失败: {e}", code=AgentErrorCode.TOOL_CALL_FAILED
             ) from e
+
+    def _resolve_in_skill(self, relative_path: str) -> str:
+        if self._skill_dir is None:
+            raise AgentRuntimeError(
+                "当前无选中skill，无法读取skill资源",
+                code=AgentErrorCode.SKILL_RESOURCE_NOT_FOUND,
+            )
+        if not relative_path:
+            raise AgentRuntimeError(
+                "路径不能为空", code=AgentErrorCode.PATH_TRAVERSAL_BLOCKED
+            )
+        normalized = os.path.normpath(os.path.join(self._skill_dir, relative_path))
+        if not normalized.startswith(self._skill_dir):
+            raise AgentRuntimeError(
+                f"路径穿越被拦截: {relative_path}",
+                code=AgentErrorCode.PATH_TRAVERSAL_BLOCKED,
+            )
+        return normalized
 
     async def write_file(self, relative_path: str, content: str) -> str:
         abs_path = self._workspace.resolve(relative_path)

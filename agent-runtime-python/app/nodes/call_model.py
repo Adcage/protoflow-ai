@@ -33,13 +33,14 @@ class CallModelNode(RuntimeNode):
         chat_model = services.chat_model_factory.create(state.resolved_model)
 
         lc_tools = []
-        if services.tool_registry is not None:
-            from app.tools.langchain_tools import create_file_tools
-            from app.tools.file_tools import Workspace, FileTools
+        from app.tools.langchain_tools import create_all_tools
+        from app.tools.file_tools import Workspace, FileTools
 
-            workspace = Workspace(context.workspace_path)
-            file_tools = FileTools(workspace)
-            lc_tools = create_file_tools(file_tools)
+        workspace = Workspace(context.workspace_path)
+        skill_dir = self._get_skill_dir(state)
+        file_tools = FileTools(workspace, skill_dir=skill_dir)
+        terminal_tools = self._create_terminal_tools(workspace)
+        lc_tools = create_all_tools(file_tools, terminal_tools=terminal_tools)
 
         if lc_tools:
             chat_model = chat_model.bind_tools(lc_tools)
@@ -121,3 +122,32 @@ class CallModelNode(RuntimeNode):
             ]
 
         return text_content, tool_calls, full_response
+
+    def _get_skill_dir(self, state: ExecutionState) -> str | None:
+        try:
+            caps = getattr(state, "selected_capabilities", None)
+            if caps is None:
+                return None
+            skill = getattr(caps, "skill", None)
+            if skill is None:
+                return None
+            return str(skill.source_path.parent)
+        except Exception:
+            return None
+
+    def _create_terminal_tools(self, workspace):
+        from app.core.config import settings
+        from app.tools.terminal_tools import TerminalTools as TT
+
+        allowed = [cmd.strip() for cmd in settings.terminal_allowed_commands.split(",") if cmd.strip()]
+        if not allowed:
+            return None
+        readonly = [cmd.strip() for cmd in settings.terminal_readonly_commands.split(",") if cmd.strip()]
+        return TT(
+            workspace=workspace,
+            allowed_commands=allowed,
+            readonly_commands=readonly,
+            default_timeout=settings.terminal_default_timeout,
+            max_timeout=settings.terminal_max_timeout,
+            max_output_bytes=settings.terminal_max_output_bytes,
+        )

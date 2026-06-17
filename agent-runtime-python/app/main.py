@@ -1,5 +1,7 @@
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +16,7 @@ from app.core.exception_handlers import (
     validation_error_handler,
 )
 from app.core.exceptions import AgentRuntimeError
+from app.core.llm_audit import get_llm_audit_writer
 from app.core.logging import setup_logging
 from app.core.middleware import RequestContextMiddleware
 from app.core.response import success
@@ -48,6 +51,10 @@ async def lifespan(app: FastAPI):
     grpc_server = await create_grpc_server()
     await grpc_server.start()
     logger.info("gRPC server started on port %s", settings.grpc_server_port)
+
+    audit_writer = get_llm_audit_writer()
+    audit_writer.start()
+
     logger.info(
         "application started | runtime=%s env=%s", settings.agent_runtime_name, settings.app_env
     )
@@ -55,6 +62,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("application shutting down...")
+    await audit_writer.stop()
     await grpc_server.stop(grace=5)
     logger.info("gRPC server stopped")
     await close_channel()
@@ -118,6 +126,44 @@ def create_app() -> FastAPI:
         return PlainTextResponse(
             generate_latest(), media_type="text/plain; version=0.0.4; charset=utf-8"
         )
+
+    if settings.app_env != "prod":
+
+        @app.get("/debug/llm-audit/status", tags=["debug"])
+        async def llm_audit_status(request: Request):
+            base_dir = Path(settings.llm_audit_dir)
+            if not base_dir.is_absolute():
+                project_root = Path(os.environ.get("AGENT_RUNTIME_ROOT", Path.cwd()))
+                base_dir = project_root / base_dir
+            existing_runs = []
+            if base_dir.exists():
+                for d in sorted(base_dir.iterdir(), reverse=True)[:20]:
+                    if d.is_dir():
+                        existing_runs.append(str(d.name))
+            return {
+                "llm_audit_enabled": settings.llm_audit_enabled,
+                "llm_audit_dir": str(base_dir),
+                "recent_runs": existing_runs,
+            }
+
+        @app.get("/debug/llm-audit/{agent_run_id}", tags=["debug"])
+        async def llm_audit_check(agent_run_id: str, request: Request):
+            base_dir = Path(settings.llm_audit_dir)
+            if not base_dir.is_absolute():
+                project_root = Path(os.environ.get("AGENT_RUNTIME_ROOT", Path.cwd()))
+                base_dir = project_root / base_dir
+            target_dir = base_dir / str(agent_run_id)
+            if not target_dir.exists():
+                return {"found": False, "agent_run_id": agent_run_id}
+            files = []
+            for f in sorted(target_dir.iterdir()):
+                files.append(
+                    {
+                        "name": f.name,
+                        "size": f.stat().st_size if f.is_file() else 0,
+                    }
+                )
+            return {"found": True, "agent_run_id": agent_run_id, "files": files}
 
     return app
 

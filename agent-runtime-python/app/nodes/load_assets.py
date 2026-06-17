@@ -1,6 +1,7 @@
 import logging
 
 from app.capabilities.common.asset_index import AssetIndex
+from app.capabilities.common.asset_summary import AssetSummary
 from app.core.error_codes import AgentErrorCode
 from app.core.exceptions import AgentRuntimeError
 from app.nodes.base import NodeMetadata, RuntimeNode
@@ -47,6 +48,57 @@ class LoadAssetsNode(RuntimeNode):
             "design_systems": len(index.design_system_registry.all()),
             "crafts": len(index.craft_registry.all()),
         }
+
+        summaries: list[dict] = []
+        for skill in index.skill_registry.all():
+            summaries.append(
+                AssetSummary(
+                    id=skill.id,
+                    kind="skill",
+                    name=skill.name,
+                    description=skill.description,
+                ).__dict__
+            )
+        for seed in index.seed_registry.all():
+            summaries.append(
+                AssetSummary(
+                    id=seed.id,
+                    kind="seed",
+                    name=seed.name,
+                    description=seed.description,
+                    code_gen_types=(seed.code_gen_type,),
+                ).__dict__
+            )
+        for template in index.template_registry.all():
+            summaries.append(
+                AssetSummary(
+                    id=template.id,
+                    kind="template",
+                    name=template.name,
+                    description=template.description,
+                    code_gen_types=(template.code_gen_type,),
+                ).__dict__
+            )
+        for ds in index.design_system_registry.all():
+            summaries.append(
+                AssetSummary(
+                    id=ds.id,
+                    kind="design_system",
+                    name=ds.name,
+                    description=ds.description,
+                    scenarios=(ds.category,) if ds.category else (),
+                ).__dict__
+            )
+        for craft in index.craft_registry.all():
+            summaries.append(
+                AssetSummary(
+                    id=craft.id,
+                    kind="craft",
+                    name=craft.name,
+                    description=craft.description,
+                ).__dict__
+            )
+        state.asset_summaries = summaries
 
         logger.info(
             "load_assets done | skills=%d seeds=%d templates=%d design_systems=%d crafts=%d",

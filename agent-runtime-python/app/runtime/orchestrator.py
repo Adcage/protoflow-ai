@@ -3,50 +3,18 @@ import logging
 import time
 
 from app.capabilities.common.asset_index import create_default_asset_manager
-from app.capabilities.craft.prompt_module import CraftRulesModule
-from app.capabilities.design_systems.prompt_module import DesignSystemModule
-from app.capabilities.seeds.prompt_module import SeedModule
-from app.capabilities.skills.prompt_module import SelectedSkillModule
-from app.capabilities.templates.prompt_module import TemplateReferenceModule
+from app.core.config import settings
 from app.core.error_codes import AgentErrorCode
 from app.core.exceptions import AgentRuntimeError
-from app.graph.definitions import GENERATION_V2, MODIFICATION_V2
-from app.graph.workflow import WorkflowEngine
 from app.modeling.policy import ModelPolicy
 from app.modeling.resolver import ModelResolver
 from app.artifacts.writer import ArtifactWriter
-from app.nodes.prepare_context import PrepareContextNode
-from app.nodes.classify_task import ClassifyTaskNode
-from app.nodes.load_assets import LoadAssetsNode
-from app.nodes.select_capabilities import SelectCapabilitiesNode
-from app.nodes.resolve_model import ResolveModelNode
-from app.nodes.compose_prompt import ComposePromptNode
-from app.nodes.call_model import CallModelNode
-from app.nodes.execute_tools import ExecuteToolsNode
-from app.nodes.collect_artifacts import CollectArtifactsNode
-from app.nodes.structure_check import StructureCheckNode
-from app.nodes.finalize import FinalizeNode
 from app.quality.structure_checker import StructureChecker
-from app.prompts.asset_modules import ArtifactOutputContractModule
-from app.prompts.default_modules import (
-    AntiRoleplayModule,
-    ChatHistorySummaryModule,
-    OutputContractModule,
-    ProjectRulesModule,
-    RuntimeBoundaryModule,
-    SafetyAndInjectionResistanceModule,
-    TaskContextModule,
-    ToolContractModule,
-)
-from app.registries.node_registry import NodeRegistry
-from app.registries.prompt_module_registry import PromptModuleRegistry
-from app.registries.tool_registry import ToolRegistry
 from app.runtime.context import CodeGenType, ExecutionContext, RunMode, ChatHistoryEntry, AppContext
 from app.runtime.event_bus import EventBus
 from app.runtime.event_mapper import ProtoEventMapper
 from app.runtime.events import RuntimeEvent, RuntimeEventType
 from app.runtime.services import RuntimeServices
-from app.runtime.state import ExecutionState
 from app.services.chat_model_factory import ChatModelFactory
 from app.grpc_client.platform_client import GrpcPlatformClient
 
@@ -71,44 +39,7 @@ class RuntimeOrchestrator:
         self._asset_manager = create_default_asset_manager()
         self._quality_checker = StructureChecker()
         self._artifact_writer = ArtifactWriter()
-        self._node_registry = self._build_node_registry()
-        self._prompt_module_registry = self._build_prompt_module_registry()
-        self._tool_registry = ToolRegistry()
-        self._workflow_engine = WorkflowEngine(self._node_registry)
         self._event_mapper = ProtoEventMapper()
-
-    def _build_node_registry(self) -> NodeRegistry:
-        registry = NodeRegistry()
-        registry.register(PrepareContextNode())
-        registry.register(ClassifyTaskNode())
-        registry.register(LoadAssetsNode())
-        registry.register(SelectCapabilitiesNode())
-        registry.register(ResolveModelNode())
-        registry.register(ComposePromptNode())
-        registry.register(CallModelNode())
-        registry.register(ExecuteToolsNode())
-        registry.register(CollectArtifactsNode())
-        registry.register(StructureCheckNode())
-        registry.register(FinalizeNode())
-        return registry
-
-    def _build_prompt_module_registry(self) -> PromptModuleRegistry:
-        registry = PromptModuleRegistry()
-        registry.register(RuntimeBoundaryModule())
-        registry.register(SafetyAndInjectionResistanceModule())
-        registry.register(ProjectRulesModule())
-        registry.register(TaskContextModule())
-        registry.register(ChatHistorySummaryModule())
-        registry.register(SelectedSkillModule())
-        registry.register(DesignSystemModule())
-        registry.register(SeedModule())
-        registry.register(TemplateReferenceModule())
-        registry.register(CraftRulesModule())
-        registry.register(ToolContractModule())
-        registry.register(ArtifactOutputContractModule())
-        registry.register(OutputContractModule())
-        registry.register(AntiRoleplayModule())
-        return registry
 
     def _build_services(self, event_bus: EventBus) -> RuntimeServices:
         return RuntimeServices(
@@ -118,10 +49,10 @@ class RuntimeOrchestrator:
             model_policy=self._model_policy,
             model_resolver=self._model_resolver,
             prompt_composer=None,
-            prompt_module_registry=self._prompt_module_registry,
-            tool_registry=self._tool_registry,
+            prompt_module_registry=None,
+            tool_registry=None,
             event_bus=event_bus,
-            node_registry=self._node_registry,
+            node_registry=None,
             asset_manager=self._asset_manager,
             quality_checker=self._quality_checker,
             artifact_writer=self._artifact_writer,
@@ -177,38 +108,72 @@ class RuntimeOrchestrator:
         )
 
     async def stream_generate(self, request):
-        async for event in self._run_workflow(request, RunMode.GENERATE, GENERATION_V2):
+        async for event in self._run_agent_loop(request, RunMode.GENERATE):
             yield event
 
     async def stream_modify(self, request):
-        async for event in self._run_workflow(request, RunMode.MODIFY, MODIFICATION_V2):
+        async for event in self._run_agent_loop(request, RunMode.MODIFY):
             yield event
 
-    async def _run_workflow(self, request, run_mode: RunMode, definition: list[str]):
+    async def _run_agent_loop(self, request, run_mode: RunMode):
+        from app.agent_loop.state import AgentLoopState
+        from app.agent_loop.graph import build_agent_loop_graph
+        from app.agent_loop.nodes.init import InitNode
+        from app.agent_loop.nodes.plan_step import PlanStepNode, ImplementStepNode
+        from app.agent_loop.nodes.finish import FinishNode
+
         agent_run_id = int(request.agent_run_id)
         event_bus = EventBus(agent_run_id=agent_run_id)
         services = self._build_services(event_bus)
         start_time = time.monotonic()
+        context = await self._build_context(request, run_mode)
 
-        workflow_exception: Exception | None = None
+        state = AgentLoopState(
+            max_iterations=settings.agent_loop_max_iterations,
+            max_mode_switches=settings.agent_loop_max_mode_switches,
+        )
+
+        init_node = InitNode(context, services)
+        plan_step = PlanStepNode(context, services)
+        implement_step = ImplementStepNode(context, services)
+        finish_node = FinishNode(context, services)
+
+        graph = build_agent_loop_graph(init_node, plan_step, implement_step, finish_node)
 
         async def _execute():
-            nonlocal workflow_exception
+            nonlocal context
             try:
-                context = await self._build_context(request, run_mode)
-                state = ExecutionState()
-                await self._workflow_engine.execute(definition, context, state, services)
+                result = await graph.ainvoke(state)
+                status = result["status"] if isinstance(result, dict) else result.status
+                iteration = result["iteration"] if isinstance(result, dict) else result.iteration
+                mode_switches = result["mode_switches"] if isinstance(result, dict) else result.mode_switches
+                files_touched = result["files_touched"] if isinstance(result, dict) else result.files_touched
+
+                logger.info(
+                    "agent_loop completed | status=%s iterations=%d switches=%d files=%d",
+                    status,
+                    iteration,
+                    mode_switches,
+                    len(files_touched),
+                )
+
+                latency_ms = int((time.monotonic() - start_time) * 1000)
+                success = status == "completed"
+                await self._platform_client.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    success=success,
+                    workspace_path=context.workspace_path,
+                    latency_ms=latency_ms,
+                    error_message="" if success else f"AgentLoop status: {status}",
+                )
             except AgentRuntimeError as e:
-                workflow_exception = e
-                logger.error("orchestrator error | agentRunId=%s error=%s", agent_run_id, e)
+                logger.error("agent_loop error | agentRunId=%s error=%s", agent_run_id, e)
                 await event_bus.emit(
                     RuntimeEvent(
                         RuntimeEventType.RUNTIME_ERROR, {"message": str(e), "code": int(e.code)}
                     )
                 )
-                await event_bus.emit(
-                    RuntimeEvent(RuntimeEventType.DONE, {"message": f"运行失败: {e}"})
-                )
+                await event_bus.emit(RuntimeEvent(RuntimeEventType.DONE, {"message": f"失败: {e}"}))
                 try:
                     await self._platform_client.complete_agent_run(
                         agent_run_id=agent_run_id,
@@ -219,9 +184,8 @@ class RuntimeOrchestrator:
                 except Exception:
                     pass
             except Exception as e:
-                workflow_exception = e
                 logger.error(
-                    "orchestrator unexpected error | agentRunId=%s error=%s",
+                    "agent_loop unexpected error | agentRunId=%s error=%s",
                     agent_run_id,
                     e,
                     exc_info=True,
@@ -232,9 +196,7 @@ class RuntimeOrchestrator:
                         {"message": str(e), "code": AgentErrorCode.INTERNAL_ERROR},
                     )
                 )
-                await event_bus.emit(
-                    RuntimeEvent(RuntimeEventType.DONE, {"message": f"运行异常: {e}"})
-                )
+                await event_bus.emit(RuntimeEvent(RuntimeEventType.DONE, {"message": f"异常: {e}"}))
                 try:
                     await self._platform_client.complete_agent_run(
                         agent_run_id=agent_run_id,
@@ -245,7 +207,7 @@ class RuntimeOrchestrator:
                 except Exception:
                     pass
             finally:
-                await event_bus.close()
+                pass
 
         workflow_task = asyncio.create_task(_execute())
 

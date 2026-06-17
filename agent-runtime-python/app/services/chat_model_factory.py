@@ -3,6 +3,7 @@ from langchain_openai import ChatOpenAI
 from app.core.config import settings
 from app.core.error_codes import AgentErrorCode
 from app.core.exceptions import AgentRuntimeError
+from app.core.llm_audit import get_llm_audit_writer, _mask_api_key
 
 SUPPORTED_PROVIDERS = {"openai", "openai-compatible"}
 
@@ -34,5 +35,14 @@ class ChatModelFactory:
 
         if base_url:
             kwargs["base_url"] = base_url
+
+        writer = get_llm_audit_writer()
+        if writer.enabled:
+            audit_metadata = {
+                "llm_audit_api_key_prefix": _mask_api_key(api_key),
+                "llm_audit_provider": provider,
+            }
+            kwargs["callbacks"] = [writer.get_callback()]
+            kwargs["metadata"] = audit_metadata
 
         return ChatOpenAI(**kwargs)

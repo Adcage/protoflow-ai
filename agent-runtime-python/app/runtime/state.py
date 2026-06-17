@@ -53,3 +53,11 @@ class ExecutionState:
     artifact_manifest_path: str = ""
     asset_counts: dict[str, int] = field(default_factory=dict)
     internal_summary: str = ""
+    generation_plan: Any | None = None
+    planning_decision: str = ""
+    project_mode: str = ""
+    workflow_route: str = ""
+    planning_required_confirmation: bool = False
+    clarification_questions: list[dict[str, Any]] = field(default_factory=list)
+    implementation_outline: dict[str, Any] = field(default_factory=dict)
+    planning_warnings: list[str] = field(default_factory=list)

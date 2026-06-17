@@ -48,6 +48,8 @@ class ProtoEventMapper:
                 RuntimeEventType.NODE_COMPLETED,
                 RuntimeEventType.CAPABILITY_SELECTED,
                 RuntimeEventType.MODEL_SELECTED,
+                RuntimeEventType.CLARIFICATION_REQUIRED,
+                RuntimeEventType.MODE_SWITCHED,
             }
             if event.event_type in internal_types:
                 return None

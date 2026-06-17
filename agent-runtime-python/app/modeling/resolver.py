@@ -25,6 +25,8 @@ class ModelResolver:
         self._bundle: dict[ModelRole, ResolvedModelConfig] = {}
 
     async def load_bundle(self, context) -> None:
+        if self._bundle:
+            return
         try:
             bundle = await self._platform_client.resolve_runtime_model_bundle(
                 user_id=context.user_id,

@@ -109,7 +109,7 @@ class ChatHistorySummaryModule(PromptModule):
             return ""
         lines = ["对话历史："]
         for entry in context.chat_history[-10:]:
-            lines.append(f"  [{entry.role}]: {entry.content[:200]}")
+            lines.append(f"  [{entry.role}]: {entry.content}")
         return "\n".join(lines)
 
 
@@ -120,8 +120,10 @@ class ToolContractModule(PromptModule):
         return (
             "工具使用规则：\n"
             "- 使用 write_file 工具写入文件，参数为 relative_path 和 content\n"
-            "- 使用 read_file 工具读取已有文件，参数为 relative_path\n"
+            "- 使用 read_file 工具读取已有文件，参数为 relative_path 和 scope（默认 workspace，可选 skill）\n"
             "- 使用 read_dir 工具查看目录结构，参数为 relative_path\n"
+            "- 使用 run_command 工具在工作区执行终端命令，参数为 command 和 timeout\n"
+            "- 仅在 skill 工作流明确要求时使用 run_command（如安装依赖、构建项目、运行检查脚本）\n"
             "- 文件路径使用正斜杠 / 分隔\n"
             "- 生成完整文件内容，不要使用省略号或占位符"
         )

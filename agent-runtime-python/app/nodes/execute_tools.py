@@ -11,6 +11,8 @@ from app.runtime.events import RuntimeEvent, RuntimeEventType
 from app.runtime.state import ExecutionState, ToolCallRecord
 from app.runtime.services import RuntimeServices
 from app.tools.file_tools import Workspace, FileTools
+from app.tools.terminal_tools import TerminalTools
+from app.core.config import settings
 
 logger = logging.getLogger("app.nodes.execute_tools")
 
@@ -27,7 +29,10 @@ class ExecuteToolsNode(RuntimeNode):
         services: RuntimeServices,
     ) -> ExecutionState:
         workspace = Workspace(context.workspace_path)
-        file_tools = FileTools(workspace)
+        skill_dir = self._get_skill_dir(state)
+        file_tools = FileTools(workspace, skill_dir=skill_dir)
+        terminal_tools = self._create_terminal_tools(workspace)
+        tool_handlers = self._build_tool_handlers(file_tools, terminal_tools)
 
         max_rounds = 5
         for _round in range(max_rounds):
@@ -35,11 +40,11 @@ class ExecuteToolsNode(RuntimeNode):
                 tool_calls_to_execute = state.model_tool_calls
                 state.model_tool_calls = []
                 state = await self._execute_tool_calls(
-                    state, tool_calls_to_execute, services, file_tools
+                    state, tool_calls_to_execute, services, tool_handlers
                 )
                 if not state.model_lc_messages or not state.model_response_obj:
                     break
-                state = await self._continue_conversation(context, state, services, file_tools)
+                state = await self._continue_conversation(context, state, services, file_tools, terminal_tools)
                 continue
 
             if state.model_response_text:
@@ -50,12 +55,48 @@ class ExecuteToolsNode(RuntimeNode):
 
         return state
 
+    def _get_skill_dir(self, state: ExecutionState) -> str | None:
+        try:
+            caps = getattr(state, "selected_capabilities", None)
+            if caps is None:
+                return None
+            skill = getattr(caps, "skill", None)
+            if skill is None:
+                return None
+            return str(skill.source_path.parent)
+        except Exception:
+            return None
+
+    def _create_terminal_tools(self, workspace: Workspace) -> TerminalTools | None:
+        allowed = [cmd.strip() for cmd in settings.terminal_allowed_commands.split(",") if cmd.strip()]
+        if not allowed:
+            return None
+        readonly = [cmd.strip() for cmd in settings.terminal_readonly_commands.split(",") if cmd.strip()]
+        return TerminalTools(
+            workspace=workspace,
+            allowed_commands=allowed,
+            readonly_commands=readonly,
+            default_timeout=settings.terminal_default_timeout,
+            max_timeout=settings.terminal_max_timeout,
+            max_output_bytes=settings.terminal_max_output_bytes,
+        )
+
+    def _build_tool_handlers(self, file_tools: FileTools, terminal_tools: TerminalTools | None) -> dict:
+        handlers = {
+            "write_file": file_tools.write_file,
+            "read_file": file_tools.read_file,
+            "read_dir": file_tools.read_dir,
+        }
+        if terminal_tools is not None:
+            handlers["run_command"] = terminal_tools.run_command
+        return handlers
+
     async def _execute_tool_calls(
         self,
         state: ExecutionState,
         tool_calls: list[dict],
         services: RuntimeServices,
-        file_tools: FileTools,
+        tool_handlers: dict,
     ) -> ExecutionState:
         for tc in tool_calls:
             tool_name = tc["name"]
@@ -76,7 +117,7 @@ class ExecuteToolsNode(RuntimeNode):
 
             start_ms = time.monotonic()
             try:
-                result = await self._invoke_tool(file_tools, tool_name, tool_args)
+                result = await self._invoke_tool(tool_handlers, tool_name, tool_args)
                 duration_ms = (time.monotonic() - start_ms) * 1000
                 log_tool_call(
                     logger,
@@ -209,15 +250,11 @@ class ExecuteToolsNode(RuntimeNode):
 
         return state
 
-    async def _invoke_tool(self, file_tools: FileTools, name: str, args: dict) -> str:
-        if name == "write_file":
-            return await file_tools.write_file(args["relative_path"], args["content"])
-        elif name == "read_file":
-            return await file_tools.read_file(args["relative_path"])
-        elif name == "read_dir":
-            return await file_tools.read_dir(args.get("relative_path", "."))
-        else:
+    async def _invoke_tool(self, tool_handlers: dict, name: str, args: dict) -> str:
+        handler = tool_handlers.get(name)
+        if handler is None:
             raise AgentRuntimeError(f"未知工具: {name}", code=AgentErrorCode.TOOL_CALL_FAILED)
+        return await handler(**args)
 
     def _parse_json_output(self, text: str) -> dict:
         text = text.strip()
@@ -240,12 +277,13 @@ class ExecuteToolsNode(RuntimeNode):
         state: ExecutionState,
         services: RuntimeServices,
         file_tools: FileTools,
+        terminal_tools: TerminalTools | None,
     ) -> ExecutionState:
         if not state.model_lc_messages or not state.model_response_obj:
             return state
 
         from langchain_core.messages import AIMessageChunk, ToolMessage
-        from app.tools.langchain_tools import create_file_tools
+        from app.tools.langchain_tools import create_all_tools
 
         lc_messages = list(state.model_lc_messages)
         ai_msg = state.model_response_obj
@@ -262,7 +300,7 @@ class ExecuteToolsNode(RuntimeNode):
             lc_messages.append(ToolMessage(content=tool_result, tool_call_id=record.id))
 
         chat_model = services.chat_model_factory.create(state.resolved_model)
-        lc_tools = create_file_tools(file_tools)
+        lc_tools = create_all_tools(file_tools, terminal_tools=terminal_tools)
         if lc_tools:
             chat_model = chat_model.bind_tools(lc_tools)
 
