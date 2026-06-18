@@ -72,7 +72,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLoginUserStore } from '@/stores/LoginUser.ts'
-import { Home, FolderOpen, Settings, Users, LayoutGrid, User, BarChart3, LogOut, Menu } from '@lucide/vue'
+import { Home, FolderOpen, Settings, Users, LayoutGrid, User, BarChart3, LogOut, Menu, MessageSquare } from '@lucide/vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
@@ -84,7 +84,7 @@ loginUserStore.fetchLoginUser()
 const menuItems = [
   { key: '/', icon: Home, label: '主页' },
   { key: '/app/my', icon: FolderOpen, label: '我的作品' },
-  // { key: '/model/config', icon: Settings, label: '模型配置' },
+  { key: '/admin/test-chat', icon: MessageSquare, label: 'AI 测试对话' },
   { key: '/admin/userManage', icon: Users, label: '用户管理' },
   { key: '/admin/appManage', icon: LayoutGrid, label: '应用管理' },
 ]

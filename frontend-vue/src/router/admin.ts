@@ -1,11 +1,18 @@
 import type { RouteRecordRaw } from 'vue-router'
-import UserManagePage from '@/pages/admin/UserManagePage.vue'
 
 export default [
   {
+    path: '/admin/test-chat',
+    name: 'admin_test_chat',
+    component: () => import('@/pages/admin/TestChatPage.vue'),
+    meta: {
+      name: 'AI 测试对话',
+    },
+  },
+  {
     path: '/admin/userManage',
     name: 'admin_user',
-    component: UserManagePage,
+    component: () => import('@/pages/admin/UserManagePage.vue'),
     meta: {
       name: '用户管理',
     },
