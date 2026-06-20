@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -139,6 +138,7 @@ class LlmAuditWriter:
         self._queue: asyncio.Queue[AuditRecord | None] = asyncio.Queue()
         self._task: asyncio.Task | None = None
         self._call_counter: dict[str, int] = {}
+        self._first_timestamp: dict[str, str] = {}
 
     @property
     def enabled(self) -> bool:
@@ -147,8 +147,7 @@ class LlmAuditWriter:
     def _resolve_base_dir(self) -> Path:
         base_dir = Path(settings.llm_audit_dir)
         if not base_dir.is_absolute():
-            project_root = Path(os.environ.get("AGENT_RUNTIME_ROOT", Path.cwd()))
-            base_dir = project_root / base_dir
+            base_dir = base_dir.resolve()
         return base_dir
 
     def get_callback(self) -> LlmAuditCallback:
@@ -190,7 +189,15 @@ class LlmAuditWriter:
 
     async def _write_record(self, record: AuditRecord) -> None:
         run_id = record.agent_run_id or record.trace_id or "unknown"
-        output_dir = self._base_dir / str(run_id)
+
+        key = str(run_id)
+        if key not in self._first_timestamp:
+            self._first_timestamp[key] = record.timestamp
+
+        dt = datetime.fromisoformat(self._first_timestamp[key])
+        date_str = dt.strftime("%Y-%m-%d")
+        hm = dt.strftime("%H%M")
+        output_dir = self._base_dir / date_str / f"{hm}_{run_id}"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         key = str(run_id)

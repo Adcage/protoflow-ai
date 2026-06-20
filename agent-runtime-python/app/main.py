@@ -1,5 +1,4 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -133,13 +132,21 @@ def create_app() -> FastAPI:
         async def llm_audit_status(request: Request):
             base_dir = Path(settings.llm_audit_dir)
             if not base_dir.is_absolute():
-                project_root = Path(os.environ.get("AGENT_RUNTIME_ROOT", Path.cwd()))
-                base_dir = project_root / base_dir
+                base_dir = base_dir.resolve()
             existing_runs = []
             if base_dir.exists():
-                for d in sorted(base_dir.iterdir(), reverse=True)[:20]:
-                    if d.is_dir():
-                        existing_runs.append(str(d.name))
+                date_dirs = sorted(
+                    (d for d in base_dir.iterdir() if d.is_dir()),
+                    reverse=True,
+                )
+                for date_dir in date_dirs[:7]:
+                    for run_dir in sorted(date_dir.iterdir(), reverse=True):
+                        if run_dir.is_dir():
+                            existing_runs.append(f"{date_dir.name}/{run_dir.name}")
+                            if len(existing_runs) >= 20:
+                                break
+                    if len(existing_runs) >= 20:
+                        break
             return {
                 "llm_audit_enabled": settings.llm_audit_enabled,
                 "llm_audit_dir": str(base_dir),
@@ -150,10 +157,22 @@ def create_app() -> FastAPI:
         async def llm_audit_check(agent_run_id: str, request: Request):
             base_dir = Path(settings.llm_audit_dir)
             if not base_dir.is_absolute():
-                project_root = Path(os.environ.get("AGENT_RUNTIME_ROOT", Path.cwd()))
-                base_dir = project_root / base_dir
-            target_dir = base_dir / str(agent_run_id)
-            if not target_dir.exists():
+                base_dir = base_dir.resolve()
+            target_dir = None
+            if base_dir.exists():
+                for date_dir in sorted(base_dir.iterdir(), reverse=True):
+                    if not date_dir.is_dir():
+                        continue
+                    for run_dir in date_dir.iterdir():
+                        if run_dir.is_dir() and (
+                            run_dir.name == agent_run_id
+                            or run_dir.name.endswith(f"_{agent_run_id}")
+                        ):
+                            target_dir = run_dir
+                            break
+                    if target_dir:
+                        break
+            if not target_dir:
                 return {"found": False, "agent_run_id": agent_run_id}
             files = []
             for f in sorted(target_dir.iterdir()):
@@ -163,7 +182,7 @@ def create_app() -> FastAPI:
                         "size": f.stat().st_size if f.is_file() else 0,
                     }
                 )
-            return {"found": True, "agent_run_id": agent_run_id, "files": files}
+            return {"found": True, "agent_run_id": agent_run_id, "path": str(target_dir), "files": files}
 
     return app
 

@@ -28,12 +28,11 @@ class Settings(BaseSettings):
 
     agent_loop_max_iterations: int = 50
     agent_loop_max_mode_switches: int = 6
-
-    prompt_capture_enabled: bool = False
-    prompt_capture_dir: str = "debug/prompts"
+    agent_tool_history_max_chars: int = 40_000
+    agent_tool_result_max_chars: int = 8_000
 
     llm_audit_enabled: bool = True
-    llm_audit_dir: str = "debug/llm_audit"
+    llm_audit_dir: str = "../storage/llm_audit"
 
 
 settings = Settings()
