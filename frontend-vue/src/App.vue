@@ -1,11 +1,11 @@
 <template>
   <a-config-provider :locale="zhCN" :theme="darkTheme">
-    <BasicLayout />
+    <RouterView />
   </a-config-provider>
 </template>
 
 <script lang="ts" setup>
-import BasicLayout from '@/layouts/BasicLayout.vue'
+import { RouterView } from 'vue-router'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { theme } from 'ant-design-vue'
 import dayjs from 'dayjs'

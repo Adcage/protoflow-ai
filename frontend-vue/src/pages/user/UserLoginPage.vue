@@ -104,7 +104,14 @@ const handleSubmit = async (values: API.UserLoginRequest) => {
   if (res.data.code === 0 && res.data.data) {
     LoginUserStore.setLoginUser(res.data.data)
     message.success('登录成功')
-    await router.replace((route.query.redirect as string) || '/')
+    const redirect = route.query.redirect as string
+    if (redirect) {
+      await router.replace(redirect)
+    } else if (res.data.data.userRole === 'admin') {
+      await router.replace('/admin')
+    } else {
+      await router.replace('/')
+    }
   } else {
     message.error(res.data.message || '登录失败')
   }

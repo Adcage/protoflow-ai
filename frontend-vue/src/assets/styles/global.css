@@ -63,6 +63,14 @@ a:hover {
   background: var(--color-background) !important;
 }
 
+.ant-layout-sider {
+  background: var(--color-surface) !important;
+}
+
+.ant-layout-sider .ant-menu {
+  background: transparent !important;
+}
+
 .ant-layout-header {
   background: var(--color-surface) !important;
 }

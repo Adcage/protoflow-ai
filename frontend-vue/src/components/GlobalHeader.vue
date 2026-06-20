@@ -12,7 +12,8 @@
           :key="item.key"
           :to="item.key"
           class="nav-link"
-          active-class="nav-link-active"
+          :exact-active-class="item.key === '/' ? 'nav-link-active' : undefined"
+          :active-class="item.key !== '/' ? 'nav-link-active' : undefined"
         >
           <component :is="item.icon" :size="18" />
           <span>{{ item.label }}</span>
@@ -28,6 +29,10 @@
             </div>
             <template #overlay>
               <a-menu>
+                <a-menu-item v-if="loginUserStore.loginUser.userRole === 'admin'" key="admin" @click="router.push('/admin')">
+                  <Settings :size="16" style="margin-right: 8px" />
+                  管理后台
+                </a-menu-item>
                 <a-menu-item key="profile" @click="router.push('/user/profile')">
                   <User :size="16" style="margin-right: 8px" />
                   个人中心
@@ -72,7 +77,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLoginUserStore } from '@/stores/LoginUser.ts'
-import { Home, FolderOpen, Settings, Users, LayoutGrid, User, BarChart3, LogOut, Menu, MessageSquare } from '@lucide/vue'
+import { Home, FolderOpen, Settings, User, BarChart3, LogOut, Menu } from '@lucide/vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
@@ -84,22 +89,9 @@ loginUserStore.fetchLoginUser()
 const menuItems = [
   { key: '/', icon: Home, label: '主页' },
   { key: '/app/my', icon: FolderOpen, label: '我的作品' },
-  { key: '/admin/test-chat', icon: MessageSquare, label: 'AI 测试对话' },
-  { key: '/admin/userManage', icon: Users, label: '用户管理' },
-  { key: '/admin/appManage', icon: LayoutGrid, label: '应用管理' },
 ]
 
-const visibleMenuItems = computed(() => {
-  return menuItems.filter((item) => {
-    if (item.key.startsWith('/admin')) {
-      const loginUser = loginUserStore.loginUser
-      if (!loginUser || loginUser.userRole !== 'admin') {
-        return false
-      }
-    }
-    return true
-  })
-})
+const visibleMenuItems = computed(() => menuItems)
 
 const handleLogout = () => {
   loginUserStore.logout()
