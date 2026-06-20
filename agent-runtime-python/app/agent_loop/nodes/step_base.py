@@ -253,6 +253,18 @@ async def _execute_single_step(
             except Exception as e:
                 duration_tool = (time.monotonic() - start_tool) * 1000
                 log_tool_call(logger, tc["name"], duration_tool, status="error")
+                state.status = "failed"
+                from app.runtime.state import ToolCallRecord
+
+                state.executed_tool_calls.append(
+                    ToolCallRecord(
+                        id=tc["id"],
+                        name=tc["name"],
+                        arguments=tc["arguments"],
+                        result=None,
+                        error=str(e),
+                    )
+                )
                 await services.event_bus.emit(
                     RuntimeEvent(
                         RuntimeEventType.RUNTIME_ERROR,

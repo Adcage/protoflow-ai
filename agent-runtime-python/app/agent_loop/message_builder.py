@@ -45,6 +45,13 @@ def _tool_messages(state: AgentLoopState) -> list[BaseMessage]:
         max_result_chars=settings.agent_tool_result_max_chars,
     )
     for record in records:
+        args = record.arguments
+        if record.name == "write_file" and args.get("content_omitted"):
+            length = args.get("content_length", 0)
+            args = {
+                "relative_path": args.get("relative_path", ""),
+                "content": f"[已省略，{length}字符]",
+            }
         messages.append(
             AIMessage(
                 content="",
@@ -52,7 +59,7 @@ def _tool_messages(state: AgentLoopState) -> list[BaseMessage]:
                     {
                         "id": record.id,
                         "name": record.name,
-                        "args": record.arguments,
+                        "args": args,
                         "type": "tool_call",
                     }
                 ],
@@ -60,7 +67,7 @@ def _tool_messages(state: AgentLoopState) -> list[BaseMessage]:
         )
         messages.append(
             ToolMessage(
-                content=record.result or "",
+                content=record.error or record.result or "",
                 tool_call_id=record.id,
                 name=record.name,
             )
