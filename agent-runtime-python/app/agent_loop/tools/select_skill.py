@@ -19,8 +19,7 @@ class SelectSkillTool(BaseTool):
     name: str = "select_skill"
     description: str = (
         "从可用 Skill 列表中选择一个最适合当前任务的 Skill。"
-        "选择 Skill 后你可以用 read_asset 读取 Skill 的详细规则和参考资源，"
-        "用 run_command 执行 Skill 目录下的脚本。"
+        "选择 Skill 后可以读取其详细规则和参考资源，也可以执行其目录下的脚本。"
     )
     args_schema: Type[BaseModel] = SelectSkillInput
 
@@ -64,4 +63,4 @@ class SelectSkillTool(BaseTool):
 
         logger.info("select_skill | skill=%s reason=%s", skill_id, reason)
         skill_dir = str(skill_def.source_path.parent)
-        return f"已选择 Skill: {skill_def.name} — {skill_def.description}\n\nSkill 目录路径: {skill_dir}\n你可以用 read_asset 读取资源，或用 run_command 执行该目录下的脚本。"
+        return f"已选择 Skill: {skill_def.name} — {skill_def.description}\n\nSkill 目录路径: {skill_dir}\n你可以读取该目录下的资源，或执行其脚本。"

@@ -13,18 +13,22 @@ def _get_state_attr(state, key, default=None):
     return getattr(state, key, default)
 
 
-def _set_state_attr(state, key, value):
-    if isinstance(state, dict):
-        state[key] = value
-    else:
-        setattr(state, key, value)
+def _route_finished(state) -> bool:
+    """统一的循环终止检查，在所有条件边中使用。"""
+    if _get_state_attr(state, "status") == "waiting_for_user":
+        return True
+    if _get_state_attr(state, "status") in ("completed", "failed"):
+        return True
+    if _get_state_attr(state, "iteration") >= _get_state_attr(state, "max_iterations"):
+        return True
+    if _get_state_attr(state, "mode_switches") >= _get_state_attr(state, "max_mode_switches"):
+        return True
+    return False
 
 
 def route_after_route_step(state: AgentLoopState) -> str:
     """route_step 完成后，根据 route_decision 或 status 路由。"""
-    if _get_state_attr(state, "status") == "waiting_for_user":
-        return "finish"
-    if _get_state_attr(state, "status") in ("completed", "failed"):
+    if _route_finished(state):
         return "finish"
     decision = _get_state_attr(state, "route_decision")
     if decision and isinstance(decision, dict):
@@ -37,34 +41,58 @@ def route_after_route_step(state: AgentLoopState) -> str:
             return "implement_step"
         if mode == "validate":
             return "validate_step"
-    # 默认路由到 plan
     return "plan_step"
 
 
-def route_after_step(state: AgentLoopState) -> str:
-    """plan_step 完成后的路由逻辑（沿用原有逻辑）。"""
-    if _get_state_attr(state, "status") == "waiting_for_user":
+def route_after_plan_step(state: AgentLoopState) -> str:
+    """plan_step 完成后的路由逻辑。
+
+    Plan 不再直接进入 Implement：
+    - plan_just_finished=True → route_step
+    - 达到终止条件 → finish
+    - plan_iterations 超限 → route_step
+    - 否则 → plan_step
+    """
+    if _route_finished(state):
         return "finish"
-    if _get_state_attr(state, "status") in ("completed", "failed"):
-        return "finish"
-    if _get_state_attr(state, "iteration") >= _get_state_attr(state, "max_iterations"):
-        return "finish"
-    if _get_state_attr(state, "mode_switches") >= _get_state_attr(state, "max_mode_switches"):
-        return "finish"
-    if _get_state_attr(state, "mode") == "plan" and _get_state_attr(state, "plan_iterations") >= _get_state_attr(state, "max_plan_iterations"):
+    if _get_state_attr(state, "plan_just_finished"):
+        return "route_step"
+    if _get_state_attr(state, "plan_iterations") >= _get_state_attr(state, "max_plan_iterations"):
         logger.warning(
-            "route | plan_iterations=%d exceeded max_plan_iterations=%d, force switching to implement",
+            "route | plan_iterations=%d exceeded max_plan_iterations=%d, routing to route_step",
             _get_state_attr(state, "plan_iterations"),
             _get_state_attr(state, "max_plan_iterations"),
         )
-        _set_state_attr(state, "mode", "implement")
-        return "implement_step"
-    mode = _get_state_attr(state, "mode")
-    if mode == "plan":
-        return "plan_step"
-    if mode == "implement":
-        return "implement_step"
-    return "finish"
+        return "route_step"
+    return "plan_step"
+
+
+def route_after_implement_step(state: AgentLoopState) -> str:
+    """implement_step 完成后的路由逻辑。
+
+    finish 或结构化重新规划请求标记 implement_just_finished=True 时离开 Implement，
+    否则继续 implement_step。
+    """
+    if _route_finished(state):
+        return "finish"
+    if _get_state_attr(state, "implement_just_finished"):
+        return "route_step"
+    return "implement_step"
+
+
+def route_after_validate_step(state: AgentLoopState) -> str:
+    """validate_step 完成后的路由逻辑。
+
+    只有 decide_validation 标记 validate_just_finished=True 或达到上限时才离开，
+    否则继续 validate_step。
+    """
+    if _route_finished(state):
+        return "finish"
+    if _get_state_attr(state, "validate_just_finished"):
+        return "route_step"
+    if _get_state_attr(state, "validate_iterations") >= _get_state_attr(state, "max_validate_iterations"):
+        return "route_step"
+    return "validate_step"
 
 
 def build_agent_loop_graph(
@@ -80,9 +108,9 @@ def build_agent_loop_graph(
     图结构：
         init → route_step → [plan_step / implement_step / validate_step / finish]
 
-        大循环内：
-          plan_step ↔ implement_step → route_step → [validate_step / finish]
-          validate_step → route_step → [implement_step(修复) / finish]
+        plan_step → plan_step / route_step（计划完成→路由，否则继续规划）
+        implement_step → implement_step / route_step（完成或请求重新规划→路由，否则继续实现）
+        validate_step → validate_step / route_step（决策提交或超限→路由，否则继续校验）
     """
     graph = StateGraph(AgentLoopState)
 
@@ -96,7 +124,6 @@ def build_agent_loop_graph(
     graph.set_entry_point("init")
     graph.add_edge("init", "route_step")
 
-    # route_step 的条件边：根据 route_decision 路由
     graph.add_conditional_edges(
         "route_step",
         route_after_route_step,
@@ -108,19 +135,22 @@ def build_agent_loop_graph(
         },
     )
 
-    # plan_step 条件边
     graph.add_conditional_edges(
         "plan_step",
-        route_after_step,
-        {"plan_step": "plan_step", "implement_step": "implement_step", "finish": "finish"},
+        route_after_plan_step,
+        {"plan_step": "plan_step", "route_step": "route_step", "finish": "finish"},
     )
 
-    # implement_step 完成后标记并路由到 route_step
-    # 注意：这里需要在 implement_step 完成后设置 implement_just_finished = True
-    # 实际由 ImplementStepNode 在 _execute_single_step 返回后处理
-    graph.add_edge("implement_step", "route_step")
+    graph.add_conditional_edges(
+        "implement_step",
+        route_after_implement_step,
+        {"implement_step": "implement_step", "route_step": "route_step", "finish": "finish"},
+    )
 
-    # validate_step 完成后路由到 route_step
-    graph.add_edge("validate_step", "route_step")
+    graph.add_conditional_edges(
+        "validate_step",
+        route_after_validate_step,
+        {"validate_step": "validate_step", "route_step": "route_step", "finish": "finish"},
+    )
 
     return graph.compile()

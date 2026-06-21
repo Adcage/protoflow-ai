@@ -3,19 +3,19 @@ import logging
 from langchain_core.tools import BaseTool
 
 from app.agent_loop.nodes.step_base import (
-    _build_tool_handlers,
     _create_terminal_tools_for_mode,
     _execute_single_step,
-    _format_tool_list,
     _get_assets_dir,
     _get_skill_dir,
     _make_loop_tools,
 )
-from app.agent_loop.prompts.plan import PLAN_MODE_SYSTEM_PROMPT
-from app.agent_loop.prompts.implement import IMPLEMENT_MODE_SYSTEM_PROMPT
-from app.agent_loop.prompts.plan_spec import PLAN_SPEC
 from app.agent_loop.state import AgentLoopState
+from app.agent_loop.tool_policy import AgentMode
+from app.agent_loop.tool_resolver import ModeToolResolver
+from app.core.error_codes import AgentErrorCode
+from app.core.exceptions import AgentRuntimeError
 from app.prompts.composer import PromptComposer
+from app.prompts.profiles import PROMPT_PROFILES
 from app.runtime.context import ExecutionContext
 from app.runtime.events import RuntimeEvent, RuntimeEventType
 from app.runtime.services import RuntimeServices
@@ -29,26 +29,34 @@ def _compose_system_prompt(
     state: AgentLoopState,
     context: ExecutionContext,
     services: RuntimeServices,
-    lc_tools: list[BaseTool],
-    fallback_prompt: str,
+    toolset,
+    profile_id: str,
 ) -> str:
-    """使用 PromptComposer 构建系统提示词，若 registry 不可用则回退到硬编码提示词。"""
+    """使用 PromptComposer + profile 构建系统提示词。接收已解析的 toolset 避免重复解析。"""
     registry = getattr(services, "prompt_module_registry", None)
     if registry is None:
-        return fallback_prompt
+        raise AgentRuntimeError(
+            "PromptModuleRegistry 不可用",
+            code=AgentErrorCode.STATE_ERROR,
+        )
 
-    # 注入工具列表到 ToolListModule
-    tool_list_module = registry.get_by_id("tool_list")
-    if tool_list_module is not None:
-        tool_list_module.set_tools(lc_tools)
+    profile_module_ids = PROMPT_PROFILES.get(profile_id)
+    if profile_module_ids is None:
+        raise AgentRuntimeError(
+            f"Profile {profile_id} 不存在",
+            code=AgentErrorCode.STATE_ERROR,
+        )
 
-    composer = PromptComposer(registry.ordered_modules())
-    messages = composer.compose(context, state)
-
+    modules = registry.require_many(profile_module_ids)
+    composer = PromptComposer(modules)
+    messages = composer.compose(context, state, toolset)
     if messages and messages[0].get("role") == "system":
         return messages[0]["content"]
 
-    return fallback_prompt
+    raise AgentRuntimeError(
+        "PromptComposer 未能生成系统提示词",
+        code=AgentErrorCode.STATE_ERROR,
+    )
 
 
 class PlanStepNode:
@@ -90,32 +98,11 @@ class PlanStepNode:
 
         lc_tools.extend(_make_loop_tools(state, self._services.event_bus))
 
-        tool_handlers = _build_tool_handlers(file_tools, terminal_tools)
-        tool_handlers.pop("write_file", None)
+        toolset = ModeToolResolver.resolve(AgentMode.PLAN, lc_tools)
 
-        # 构建回退用的硬编码提示词
-        fallback_prompt = PLAN_MODE_SYSTEM_PROMPT.format(
-            tool_list=_format_tool_list(lc_tools),
-            plan_spec=PLAN_SPEC,
-        )
-        caps_text = ""
-        if state.selected_capabilities and getattr(state.selected_capabilities, "skill", None):
-            skill = state.selected_capabilities.skill
-            skill_dir_str = str(skill.source_path.parent)
-            caps_text = f"\n\n## 已选择的 Skill\n\n**{skill.name}** (ID: {skill.id}): {skill.description}\n\nSkill 目录: `{skill_dir_str}`\n\n你可以用 `read_asset(relative_path='skills/{skill.id}/SKILL.md')` 读取详细规则，或用 `run_command` 执行 `{skill_dir_str}/scripts/search.py` 等脚本。"
-        else:
-            index = getattr(state, "_asset_index", None)
-            if index is not None:
-                skills = index.skill_registry.all()
-                if skills:
-                    caps_text = "\n\n## 可用 Skill 列表\n\n你可以使用 `select_skill(skill_id, reason)` 选择一个适合当前任务的 Skill。\n\n"
-                    for s in skills:
-                        caps_text += f"- **{s.id}**: {s.description}\n"
-        fallback_prompt += caps_text
-
-        # 使用 PromptComposer 或回退
         system_prompt = _compose_system_prompt(
-            state, self._context, self._services, lc_tools, fallback_prompt
+            state, self._context, self._services, toolset,
+            profile_id="plan",
         )
 
         state.plan_iterations += 1
@@ -131,8 +118,7 @@ class PlanStepNode:
             self._context,
             self._services,
             system_prompt,
-            lc_tools,
-            tool_handlers,
+            toolset,
             file_tools,
         )
 
@@ -164,29 +150,11 @@ class ImplementStepNode:
         lc_tools.append(ReadAssetTool(file_tools=file_tools))
         lc_tools.extend(_make_loop_tools(state, self._services.event_bus))
 
-        tool_handlers = _build_tool_handlers(file_tools, terminal_tools)
+        toolset = ModeToolResolver.resolve(AgentMode.IMPLEMENT, lc_tools)
 
-        # 构建回退用的硬编码提示词
-        outline_text = "暂无实现规划"
-        if state.implementation_outline:
-            if isinstance(state.implementation_outline, dict):
-                outline_text = state.implementation_outline.get("text", str(state.implementation_outline))
-            else:
-                outline_text = str(state.implementation_outline)
-
-        fallback_prompt = IMPLEMENT_MODE_SYSTEM_PROMPT.format(
-            tool_list=_format_tool_list(lc_tools),
-            implementation_outline=outline_text,
-        )
-        if state.selected_capabilities and getattr(state.selected_capabilities, "skill", None):
-            skill = state.selected_capabilities.skill
-            skill_dir_str = str(skill.source_path.parent)
-            skill_text = f"\n\n## 已选择的 Skill\n\n**{skill.name}** (ID: {skill.id}): {skill.description}\n\nSkill 目录: `{skill_dir_str}`\n\n你可以用 `read_asset(relative_path='skills/{skill.id}/SKILL.md')` 读取详细规则，或用 `run_command` 执行 `{skill_dir_str}/scripts/search.py` 等脚本。"
-            fallback_prompt += skill_text
-
-        # 使用 PromptComposer 或回退
         system_prompt = _compose_system_prompt(
-            state, self._context, self._services, lc_tools, fallback_prompt
+            state, self._context, self._services, toolset,
+            profile_id="implement",
         )
 
         logger.info("implement_step | iteration=%d mode=%s", state.iteration + 1, state.mode)
@@ -196,14 +164,8 @@ class ImplementStepNode:
             self._context,
             self._services,
             system_prompt,
-            lc_tools,
-            tool_handlers,
+            toolset,
             file_tools,
         )
-
-        # implement 完成后标记，供 route_step 判断
-        if result.status == "running":
-            result.implement_just_finished = True
-            result.validate_just_finished = False
 
         return result

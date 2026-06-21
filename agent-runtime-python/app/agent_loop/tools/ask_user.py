@@ -46,8 +46,6 @@ class AskUserTool(BaseTool):
                 return (
                     "错误：input_type 为 single_select 或 multi_select 时必须提供 options 选项列表。"
                     "请重新调用并提供至少 3 个具体选项。"
-                    "例如：ask_user(question='请选择应用类型', input_type='single_select',"
-                    " options=['登录注册页面', '数据展示仪表盘', '待办事项列表'])"
                 )
 
         if self._state is not None:

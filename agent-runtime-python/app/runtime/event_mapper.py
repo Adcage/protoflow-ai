@@ -20,12 +20,12 @@ _VISIBLE_TOOLS = frozenset({
 
 _STATUS_TOOLS: dict[str, str] = {
     "select_skill": "正在选择设计方案...",
-    "switch_mode": "正在切换工作模式...",
     "write_plan": "正在制定实现计划...",
     "read_asset": "正在查询设计资源...",
     "run_command": "正在执行命令...",
     "decide_route": "正在路由决策...",
     "decide_validation": "正在输出校验结论...",
+    "request_replan": "正在请求重新规划...",
 }
 
 _HIDDEN_TOOLS = frozenset({"finish"})

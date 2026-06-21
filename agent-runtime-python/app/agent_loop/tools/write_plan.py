@@ -4,6 +4,9 @@ from typing import Type
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.error_codes import AgentErrorCode
+from app.core.exceptions import AgentRuntimeError
+
 logger = logging.getLogger("app.agent_loop.tools.write_plan")
 
 
@@ -17,7 +20,7 @@ class WritePlanTool(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "write_plan"
     description: str = (
-        "将实现计划写入状态。必须先调用此工具写入计划，才能切换到 implement 模式。"
+        "将实现计划写入状态。必须先调用此工具写入计划，才能进入下一阶段。"
         "可多次调用更新计划。"
     )
     args_schema: Type[BaseModel] = WritePlanInput
@@ -34,11 +37,17 @@ class WritePlanTool(BaseTool):
         if self._state is None:
             return "错误：未绑定 AgentLoopState"
 
+        if not outline or not outline.strip():
+            raise AgentRuntimeError(
+                "计划内容不能为空",
+                code=AgentErrorCode.TOOL_ARGS_ERROR,
+            )
+
         state = self._state
         state.implementation_outline = {"text": outline}
+        state.plan_just_finished = True
         logger.info("write_plan | outline length=%d", len(outline))
 
         return (
-            "实现计划已记录。确认计划完整后，调用 switch_mode(mode='implement') 开始生成代码。"
-            "如需更新计划，可再次调用 write_plan。"
+            "实现计划已记录。请停止当前阶段，编排层将决定下一步。"
         )

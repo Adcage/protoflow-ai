@@ -12,7 +12,9 @@ logger = logging.getLogger("app.agent_loop.state")
 _PERSIST_FIELDS = (
     "mode", "status", "iteration", "mode_switches",
     "selected_skill_id", "implementation_outline", "clarification_questions",
-    "files_touched", "executed_tool_calls", "conversation_messages",
+    "files_touched", "implement_phase_files",
+    "implement_replan_requested", "implement_replan_reason",
+    "executed_tool_calls", "conversation_messages",
     "resolved_model", "plan_iterations",
     # 前置路由
     "route_decided", "route_decision", "route_iterations",
@@ -20,6 +22,7 @@ _PERSIST_FIELDS = (
     # 校验循环
     "validate_iterations", "validation_failures", "validation_check_results",
     "validation_status", "implement_just_finished", "validate_just_finished",
+    "plan_just_finished",
     # 测试模式
     "is_test",
     # 提示词追踪
@@ -31,7 +34,7 @@ _PERSIST_FIELDS = (
 
 @dataclass
 class AgentLoopState:
-    mode: Literal["plan", "implement", "validate", "route", "finish"] = "plan"
+    mode: Literal["plan", "implement", "validate", "finish"] = "plan"
     status: Literal["running", "completed", "failed", "waiting_for_user"] = "running"
 
     iteration: int = 0
@@ -44,6 +47,9 @@ class AgentLoopState:
     clarification_questions: list[dict] = field(default_factory=list)
 
     files_touched: list[str] = field(default_factory=list)
+    implement_phase_files: list[str] = field(default_factory=list)
+    implement_replan_requested: bool = False
+    implement_replan_reason: str = ""
     executed_tool_calls: list[ToolCallRecord] = field(default_factory=list)
     model_response_text: str = ""
 
@@ -61,7 +67,6 @@ class AgentLoopState:
     route_decided: bool = False
     route_decision: dict | None = None   # {"mode": "plan", "code_gen_type": "", "reason": ""}
     route_iterations: int = 0
-    max_route_iterations: int = 3
     recommended_code_gen_type: str | None = None
 
     # 校验循环
@@ -72,6 +77,7 @@ class AgentLoopState:
     validation_status: Literal["pending", "passed", "failed"] = "pending"
 
     # 阶段标记（用于 route_step 提示词模块判断）
+    plan_just_finished: bool = False
     implement_just_finished: bool = False
     validate_just_finished: bool = False
 

@@ -4,14 +4,15 @@ import time
 from typing import Any
 
 from langchain_core.messages import AIMessageChunk
-from pydantic_core import PydanticUndefined
 from langchain_core.tools import BaseTool
 
 from app.agent_loop.state import AgentLoopState
 from app.agent_loop.message_builder import build_llm_messages
-from app.agent_loop.tools.switch_mode import SwitchModeTool
+from app.agent_loop.tool_resolver import ResolvedToolSet
+from app.agent_loop.tool_policy import AgentMode
 from app.agent_loop.tools.ask_user import AskUserTool
 from app.agent_loop.tools.finish_tool import FinishTool
+from app.agent_loop.tools.request_replan import RequestReplanTool
 from app.agent_loop.tools.select_skill import SelectSkillTool
 from app.agent_loop.tools.write_plan import WritePlanTool
 from app.core.config import settings
@@ -73,57 +74,19 @@ def _create_terminal_tools_for_mode(
     )
 
 
-def _build_tool_handlers(
-    file_tools: FileTools, terminal_tools: TerminalTools | None
-) -> dict[str, Any]:
-    handlers: dict[str, Any] = {
-        "write_file": file_tools.write_file,
-        "read_file": file_tools.read_file,
-        "read_dir": file_tools.read_dir,
-        "read_asset": file_tools.read_asset,
-    }
-    if terminal_tools is not None:
-        handlers["run_command"] = terminal_tools.run_command
-    return handlers
-
-
 def _make_loop_tools(state: AgentLoopState, event_bus) -> list[BaseTool]:
-    switch = SwitchModeTool()
-    switch.set_state(state)
     ask = AskUserTool()
     ask.set_state(state)
     ask.set_event_bus(event_bus)
     finish = FinishTool()
     finish.set_state(state)
+    request_replan = RequestReplanTool()
+    request_replan.set_state(state)
     select_skill = SelectSkillTool()
     select_skill.set_state(state)
     write_plan = WritePlanTool()
     write_plan.set_state(state)
-    return [write_plan, select_skill, switch, ask, finish]
-
-
-def _format_tool_list(tools: list[BaseTool]) -> str:
-    lines: list[str] = []
-    for tool in tools:
-        name = tool.name
-        desc = tool.description
-        args_part = _format_tool_args(tool)
-        lines.append(f"- `{name}{args_part}` — {desc}")
-    return "\n".join(lines)
-
-
-def _format_tool_args(tool: BaseTool) -> str:
-    if tool.args_schema is None:
-        return "()"
-    schema = tool.args_schema
-    fields: list[str] = []
-    for field_name, field_info in schema.model_fields.items():
-        default = field_info.default
-        if default is not None and default is not PydanticUndefined:
-            fields.append(f"{field_name}={default}")
-        else:
-            fields.append(field_name)
-    return "(" + ", ".join(fields) + ")"
+    return [write_plan, select_skill, ask, finish, request_replan]
 
 
 def _serialize_tool_arguments(arguments: Any) -> str:
@@ -149,34 +112,21 @@ def _serialize_tool_arguments(arguments: Any) -> str:
         return "{}"
 
 
-async def _invoke_tool_handler(
-    tool_handlers: dict[str, Any], name: str, args: dict, lc_tools: list[BaseTool] | None = None
-) -> str:
-    handler = tool_handlers.get(name)
-    if handler is not None:
-        return await handler(**args)
-    if lc_tools is not None:
-        for tool in lc_tools:
-            if tool.name == name:
-                return await tool._arun(**args)
-    raise AgentRuntimeError(f"未知工具: {name}", code=AgentErrorCode.TOOL_CALL_FAILED)
-
-
 async def _execute_single_step(
     state: AgentLoopState,
     context: ExecutionContext,
     services: RuntimeServices,
     system_prompt: str,
-    lc_tools: list[BaseTool],
-    tool_handlers: dict[str, Any],
+    toolset: ResolvedToolSet,
     file_tools: FileTools,
 ) -> AgentLoopState:
     if not state.resolved_model:
         state.status = "failed"
         return state
 
+    effective_tools = list(toolset.tools)
     chat_model = services.chat_model_factory.create(state.resolved_model)
-    chat_model = chat_model.bind_tools(lc_tools)
+    chat_model = chat_model.bind_tools(effective_tools)
 
     lc_messages = build_llm_messages(system_prompt, context, state)
 
@@ -211,8 +161,6 @@ async def _execute_single_step(
         state.status = "failed"
         return state
 
-    # AI 可能在同一轮既输出文本又调用工具（如边 write_file 边给"写入成功"总结）。
-    # 之前有 tool_calls 时整段 text_content 被丢弃，前端看不到 AI 的过程说明与完成总结。
     if text_content:
         log_response(logger, text_content, label="model_response")
 
@@ -221,20 +169,27 @@ async def _execute_single_step(
             await services.event_bus.emit(
                 RuntimeEvent(
                     RuntimeEventType.TOOL_CALL,
-                    {"id": tc["id"], "name": tc["name"], "arguments": _serialize_tool_arguments(tc["arguments"])},
+                    {
+                        "id": tc["id"],
+                        "name": tc["name"],
+                        "arguments": _serialize_tool_arguments(tc["arguments"]),
+                    },
                 )
             )
 
             start_tool = time.monotonic()
             try:
-                result = await _invoke_tool_handler(
-                    tool_handlers, tc["name"], tc["arguments"], lc_tools
-                )
+                toolset.require(tc["name"])
+                result = await toolset.invoke(tc["name"], tc["arguments"])
                 duration_tool = (time.monotonic() - start_tool) * 1000
                 log_tool_call(logger, tc["name"], duration_tool, status="ok")
 
                 if tc["name"] == "write_file" and "relative_path" in tc["arguments"]:
-                    state.files_touched.append(tc["arguments"]["relative_path"])
+                    path = tc["arguments"]["relative_path"]
+                    state.files_touched.append(path)
+                    if toolset.mode == AgentMode.IMPLEMENT:
+                        if path not in state.implement_phase_files:
+                            state.implement_phase_files.append(path)
 
                 await services.event_bus.emit(
                     RuntimeEvent(
