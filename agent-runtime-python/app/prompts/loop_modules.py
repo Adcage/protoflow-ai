@@ -5,8 +5,18 @@ from typing import Any
 from app.prompts.modules import PromptModule
 
 
+def _get_effective_type(state, context) -> str:
+    artifact_type = getattr(state, "artifact_type_state", None)
+    if artifact_type is not None and getattr(artifact_type, "effective", None):
+        return artifact_type.effective
+    code_gen_type = getattr(context, "code_gen_type", None)
+    if code_gen_type is not None:
+        return code_gen_type.value if hasattr(code_gen_type, "value") else str(code_gen_type)
+    return "unknown"
+
+
 class PlanWorkflowModule(PromptModule):
-    """plan 模式工作流指令，从 PLAN_MODE_SYSTEM_PROMPT 拆解。"""
+    """plan 模式工作流指令（Phase 3 用户驱动设计流程）。"""
 
     id = "plan_workflow"
     category = "strategic"
@@ -14,47 +24,102 @@ class PlanWorkflowModule(PromptModule):
     def enabled(self, context: Any, state: Any) -> bool:
         return getattr(state, "mode", "") == "plan"
 
+    def _format_clarification_history(self, state: Any) -> str:
+        """展示已提出的澄清问题，避免模型反复询问同一问题。"""
+        questions = getattr(state, "clarification_questions", None) or []
+        if not questions:
+            return ""
+        lines = ["\n### 已澄清的问题\n"]
+        for q in questions:
+            if isinstance(q, dict):
+                text = q.get("prompt") or q.get("question") or ""
+                qid = q.get("id", "")
+            else:
+                text = str(q)
+                qid = ""
+            if qid:
+                lines.append(f"- [{qid}] {text}")
+            else:
+                lines.append(f"- {text}")
+        lines.append("\n上述问题已提出，请勿再次询问。如用户回答已在对话历史中，直接根据回答继续。\n")
+        return "\n".join(lines)
+
+    def _format_stage(self, state: Any) -> str:
+        envelope = getattr(state, "_state_envelope", None)
+        if envelope is None:
+            return ""
+        plan = getattr(envelope.workflow, "plan", None)
+        if plan is None:
+            return ""
+        stage = getattr(plan, "plan_stage", "discover_direction")
+        return f"当前 PlanStage：{stage}\n"
+
     def render(self, context: Any, state: Any) -> str:
+        clarification_history = self._format_clarification_history(state)
+        stage_line = self._format_stage(state)
         return (
-            "你处于规划模式（Plan Mode）。你的职责是充分理解用户需求，制定完整的实现计划，然后提交规划结果。\n"
+            "你处于规划模式（Plan Mode）。你的职责是充分理解用户需求，"
+            "完成多轮用户驱动设计澄清，并基于用户确认的结构化 DesignSpecification"
+            "生成结构化 ImplementationPlan，由 Route 决定下一阶段。\n"
             "\n"
-            "**核心原则：plan 模式的价值在于搞清楚用户要什么。需求不明确时，必须先问清楚再做计划。**\n"
+            "**核心原则：plan 模式是用户驱动的设计澄清与确认流程；你不能替用户做关键选择、"
+            "不能直接进入实现、不能修改任何项目文件。**\n"
+            f"{clarification_history}"
+            f"{stage_line}"
             "\n"
-            "## 工作流\n"
+            "## 工作流（必须严格按当前 PlanStage 推进）\n"
             "\n"
-            "**步骤 0：澄清需求（必须先判断）**\n"
+            "**阶段推进规则**：每个 PlanStage 都有唯一允许的状态提交工具，"
+            "调用它把对应字段写入状态后才能推进到下一阶段；跳阶段提交会被状态机拒绝。"
+            "被拒绝时请改用本阶段允许的提交工具重试，不要直接结束对话。\n"
             "\n"
-            "如果用户需求不够清晰——只说了一句话、没有说明功能、没有描述页面内容——你必须发起选择式提问。\n"
+            "**discover_direction**：首次进入或用户改换方向时停留此阶段。"
+            "必须询问应用方向、目标用户、主要使用场景；缺一即停留。"
+            "本阶段需要提交**需求摘要**（application_direction + target_users 必填）后才能推进。\n"
             "\n"
-            "**提问规则（必须严格遵守）：**\n"
-            "- 使用单选模式\n"
-            "- 提供至少 3 个、最多 5 个具体选项\n"
-            "- 每个选项用简短的短语描述一种可能（如'登录注册页面'、'数据展示仪表盘'、'待办事项列表'）\n"
-            "- 根据用户原始需求推断可能的意图来设计选项，不要把问题丢回给用户\n"
-            "用户回答后，根据回答继续下面的步骤。\n"
-            "如果用户需求已经非常明确（如详细描述了功能和布局），可以跳过此步骤直接进入步骤 1。\n"
+            "**discover_scope**：方向摘要已提交后进入此阶段。询问功能范围、内容与数据需求、"
+            "响应式目标、可访问性期望。每次只问同一决策层的少量问题（1~3 个）。"
+            "范围澄清后需要提交**项目检查记录**（新建项目 decision=not_applicable，"
+            "已有项目 decision=inspected + evidence_files）后推进。\n"
             "\n"
-            "**步骤 1：判断是否有 Skill（1 步）**\n"
+            "**inspect_existing_project**：已有项目修改时执行。必须只读检查相关目录与关键文件，"
+            "使用**项目检查记录工具**写入 decision=inspected 并提供 evidence_files；"
+            "新建项目使用 decision=not_applicable。\n"
             "\n"
-            "- 如果有选中的 Skill：Skill 正文已在上方「已选择的 Skill」段落中加载，直接阅读即可，**不要再读取 SKILL.md**。如需参考布局/清单，按需读取参考文件。然后进入步骤 2。\n"
-            "- 如果没有选中的 Skill：**直接进入步骤 2**，不要反复查看空工作区。\n"
+            "**Skill 选择阶段**：基于需求和项目证据，从当前模式可用工具中选择合适的 Skill 入口。"
+            "必须填写 selected_reason 引用证据；如确无匹配 Skill，形成结构化 NO_MATCHING_SKILL open item。"
+            "选择 Skill 后自动推进到设计阶段。\n"
             "\n"
-            "**步骤 2：编写实现计划（1 步）**\n"
+            "**design_propose 阶段**：使用当前模式的**设计提交工具**提交结构化 DesignSpecification。"
+            "每个关键维度（视觉方向、配色、字体、组件语言、交互、响应式）必须给出至少 2~3 个互斥候选。"
+            "提交后自动进入设计确认阶段。\n"
             "\n"
-            "按照计划编写规范，写入实现计划。计划必须包含文件清单、生成顺序、技术选型和关键逻辑。\n"
+            "**design_confirm 阶段**：完整展示设计建议与所有备选；调用结构化提问工具让用户在"
+            "「没有需要调整」「需要调整」之间二选一。"
+            "用户明确表示没有调整后，设计自动确认并推进到实施计划阶段。\n"
             "\n"
-            "**步骤 3：提交规划结果**\n"
+            "**实施计划生成阶段**：设计确认后自动进入此阶段；"
+            "不要再次询问「是否需要生成实施计划」。使用**实施计划写入工具**提交结构化 ImplementationPlan。"
+            "每个 ImplementationTask 必须包含 task_id、"
+            "goal、allowed_files、prohibited_files、dependencies、inputs、outputs、"
+            "test_requirements、acceptance_criteria。\n"
             "\n"
-            "计划写入后，提交当前阶段结果并停止，由编排层决定下一阶段。\n"
+            "## 关键约束\n"
+            "\n"
+            "- 禁止根据最佳实践替用户决定功能、布局、配色、风格或交互；\n"
+            "- 禁止把「推荐」写成「已确认」；\n"
+            "- 禁止在用户未确认最终设计时生成实施计划；\n"
+            "- 禁止写业务文件、修改项目文件或执行写命令；\n"
+            "- 禁止切换到 implement 或 validate；\n"
+            "- 禁止达到调用硬上限后自动宣称完成；\n"
+            "- 一轮只询问同一决策层的少量问题，禁止把整张大表单一次抛出。\n"
             "\n"
             "## 注意事项\n"
             "\n"
-            "- 你只能使用规划类工具（读取文件、询问用户、选择 Skill、编写计划）\n"
-            "- 工作区为空时不要反复查看目录，直接开始规划\n"
-            "- 如果连续 3 步没有进展，立即写入当前理解并提交规划结果\n"
-            "- 不要在 plan 模式反复徘徊，目标是最多 3-4 步内提交结果\n"
-            "- 对于配色、字体间距等不影响功能结构的纯视觉细节，可以在已确认需求、项目规则限定的范围内选择具体值\n"
-            "- **不要在回复中复述 Skill 原文内容**，只提取关键规则和约束用于指导实现，对用户可见的回复必须是简洁的中文摘要"
+            "- Plan 阶段模型调用硬上限 60 次；达到 30 次时由编排层触发自检；"
+            "达到 60 次且未满足完成门禁时进入 blocked 或 waiting_for_user。\n"
+            "- 不得连续抛出 3 次以上单选；否则将触发状态机告警。\n"
+            "- 当前模式的可用能力见上方工具列表，具体工具名称和参数由系统动态提供。"
         )
 
 
@@ -64,8 +129,36 @@ class ImplementWorkflowModule(PromptModule):
     id = "implement_workflow"
     category = "strategic"
 
+    # 与 ProjectRulesModule 保持一致的强制产物清单，作为阶段完成的硬门禁
+    _REQUIRED_ARTIFACTS: dict[str, list[str]] = {
+        "single_file": ["index.html"],
+        "multi-file": ["index.html", "style.css", "script.js"],
+    }
+
     def enabled(self, context: Any, state: Any) -> bool:
         return getattr(state, "mode", "") == "implement"
+
+    def _build_artifact_progress(self, code_gen_type: str, state: Any) -> str:
+        """根据项目类型和已写入文件构建进度提示。"""
+        required = list(self._REQUIRED_ARTIFACTS.get(code_gen_type, []))
+        written = list(getattr(state, "implement_phase_files", []) or [])
+
+        if not required:
+            return ""
+
+        written_set = set(written)
+        lines = ["### 必须生成的文件清单\n"]
+        for f in required:
+            marker = "[已完成]" if f in written_set else "[待生成]"
+            lines.append(f"- {marker} {f}")
+
+        remaining = [f for f in required if f not in written_set]
+        if remaining:
+            lines.append(f"\n下一个待生成文件：{remaining[0]}")
+        else:
+            lines.append("\n所有必须文件已生成，应提交完成结果。")
+
+        return "\n".join(lines) + "\n"
 
     def render(self, context: Any, state: Any) -> str:
         outline_text = "暂无实现规划"
@@ -76,14 +169,7 @@ class ImplementWorkflowModule(PromptModule):
             else:
                 outline_text = str(outline)
 
-        code_gen_type = "unknown"
-        recommended = getattr(state, "recommended_code_gen_type", None)
-        if recommended:
-            code_gen_type = recommended
-        elif context and hasattr(context, "code_gen_type"):
-            ct = getattr(context, "code_gen_type", None)
-            if ct:
-                code_gen_type = ct.value if hasattr(ct, "value") else str(ct)
+        code_gen_type = _get_effective_type(state, context)
 
         is_vue = code_gen_type == "vue_project"
         dependency_step = ""
@@ -91,6 +177,8 @@ class ImplementWorkflowModule(PromptModule):
             dependency_step = (
                 "\n- 项目类型为 Vue 工程：所有文件写入后，如果终端工具可用，应安装依赖包；如果终端工具不可用，跳过此步。\n"
             )
+
+        artifact_progress = self._build_artifact_progress(code_gen_type, state)
 
         parts = [
             "你处于实现模式（Implement Mode）。你的职责是按照实施计划将项目代码写入工作区。\n",
@@ -109,6 +197,12 @@ class ImplementWorkflowModule(PromptModule):
             "- 只修改与当前需求直接相关的内容，保持未授权文件和既有行为不变。\n",
             "- 每次修改都写入完整的文件内容。\n",
             "- 修改完成后，提交完成结果并说明修改了什么。\n",
+            "\n## 阶段完成门禁\n",
+            "\n完成当前阶段前必须满足：\n",
+            "- 已生成项目规则要求的全部文件，且每个文件内容完整可运行；\n",
+            "- 不得在同一文件上反复重写（同一文件连续写入超过一次即视为已完成，应继续下一个文件）；\n",
+            "- 未生成全部必须文件前，不得提交完成结果。\n",
+            f"\n{artifact_progress}",
             "\n## 计划不完整时的处理\n",
             "\n如果实施计划缺少以下关键信息，不能继续实现：\n",
             "- 缺少架构决策（框架选择、路由方案、状态管理模式等）；\n",

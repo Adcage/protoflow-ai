@@ -20,10 +20,6 @@ class PromptModuleRegistry:
         self._modules.append(module)
         logger.debug("register | module=%s category=%s", module.id, module.category)
 
-    def ordered_modules(self) -> list[PromptModule]:
-        """按注册顺序返回所有模块。"""
-        return list(self._modules)
-
     def get_by_id(self, module_id: str) -> PromptModule | None:
         """按 ID 查找模块。"""
         for m in self._modules:
@@ -34,6 +30,11 @@ class PromptModuleRegistry:
     def modules_by_category(self, category: str) -> list[PromptModule]:
         """按类别筛选模块。"""
         return [m for m in self._modules if m.category == category]
+
+    @property
+    def module_ids(self) -> list[str]:
+        """返回所有已注册模块的 ID 列表。"""
+        return [m.id for m in self._modules]
 
     def require_many(self, module_ids: tuple[str, ...]) -> list[PromptModule]:
         """按 ID 列表严格解析模块，拒绝缺失或重复。

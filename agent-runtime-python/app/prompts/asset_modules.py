@@ -6,15 +6,22 @@ from app.prompts.modules import PromptModule
 logger = logging.getLogger("app.prompts.asset_modules")
 
 
+def _get_effective_type(state, context) -> str:
+    artifact_type = getattr(state, "artifact_type_state", None)
+    if artifact_type is not None and getattr(artifact_type, "effective", None):
+        return artifact_type.effective
+    code_gen_type = getattr(context, "code_gen_type", None)
+    if code_gen_type is not None:
+        return code_gen_type.value if hasattr(code_gen_type, "value") else str(code_gen_type)
+    return "unknown"
+
+
 class ArtifactOutputContractModule(PromptModule):
     id = "artifact_output_contract"
     category = "strategic"
 
     def render(self, context: Any, state: Any) -> str:
-        code_gen_type = getattr(context, "code_gen_type", None)
-        # 优先使用 state 中推荐的应用类型
-        recommended = getattr(state, "recommended_code_gen_type", None)
-        type_value = recommended if recommended else (code_gen_type.value if code_gen_type else "unknown")
+        type_value = _get_effective_type(state, context)
 
         base_rules = (
             "## Artifact Output Contract\n"

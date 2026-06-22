@@ -1,6 +1,16 @@
 from app.prompts.modules import PromptModule
 
 
+def _get_effective_type(state, context) -> str:
+    artifact_type = getattr(state, "artifact_type_state", None)
+    if artifact_type is not None and getattr(artifact_type, "effective", None):
+        return artifact_type.effective
+    code_gen_type = getattr(context, "code_gen_type", None)
+    if code_gen_type is not None:
+        return code_gen_type.value if hasattr(code_gen_type, "value") else str(code_gen_type)
+    return "unknown"
+
+
 class RuntimeBoundaryModule(PromptModule):
     id = "runtime_boundary"
     category = "mandatory"
@@ -69,10 +79,7 @@ class ProjectRulesModule(PromptModule):
     )
 
     def render(self, context, state) -> str:
-        code_gen_type = getattr(context, "code_gen_type", None)
-        # 优先使用 state 中推荐的应用类型（route_step 中用户选择的结果）
-        recommended = getattr(state, "recommended_code_gen_type", None)
-        type_value = recommended if recommended else (code_gen_type.value if code_gen_type else "unknown")
+        type_value = _get_effective_type(state, context)
         rules_map = {
             "single_file": self._SINGLE_FILE_RULES,
             "multi-file": self._MULTI_FILE_RULES,

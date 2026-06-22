@@ -5,6 +5,16 @@ from typing import Any
 from app.prompts.modules import PromptModule
 
 
+def _get_effective_type(state, context) -> str:
+    artifact_type = getattr(state, "artifact_type_state", None)
+    if artifact_type is not None and getattr(artifact_type, "effective", None):
+        return artifact_type.effective
+    code_gen_type = getattr(context, "code_gen_type", None)
+    if code_gen_type is not None:
+        return code_gen_type.value if hasattr(code_gen_type, "value") else str(code_gen_type)
+    return "unknown"
+
+
 class RouteInitialModule(PromptModule):
     """首次路由模块，判断进入 plan / implement 模式。
     信息不足时进入 Plan 澄清，不直接向用户提问。"""
@@ -16,9 +26,11 @@ class RouteInitialModule(PromptModule):
         return not getattr(state, "route_decided", False)
 
     def render(self, context: Any, state: Any) -> str:
-        code_gen_type = getattr(context, "code_gen_type", None)
-        type_value = code_gen_type.value if code_gen_type else None
-        recommended = getattr(state, "recommended_code_gen_type", None)
+        type_value = _get_effective_type(state, context)
+        recommended = None
+        artifact_type = getattr(state, "artifact_type_state", None)
+        if artifact_type is not None:
+            recommended = getattr(artifact_type, "recommended", None)
 
         type_status = ""
         if recommended:
@@ -61,11 +73,13 @@ class RouteAfterPlanModule(PromptModule):
         return getattr(state, "plan_just_finished", False)
 
     def render(self, context: Any, state: Any) -> str:
-        outline = getattr(state, "implementation_outline", None)
-        has_plan = outline is not None and (
-            isinstance(outline, dict) and outline.get("text", "").strip()
-        )
-
+        # Phase 3: Plan 产物为结构化 ImplementationPlan（v2 envelope）
+        has_plan = False
+        envelope = getattr(state, "_state_envelope", None)
+        if envelope is not None:
+            plan_state = getattr(envelope.workflow, "plan", None)
+            if plan_state is not None and getattr(plan_state, "implementation_plan", None) is not None:
+                has_plan = True
         plan_status = "已有完整实施计划" if has_plan else "计划不完整或为空"
 
         return (
@@ -78,7 +92,9 @@ class RouteAfterPlanModule(PromptModule):
             "### 判断规则\n"
             "\n"
             "- 计划完整：进入实现模式\n"
-            "- 计划不完整：继续规划模式\n"
+            "- 计划不完整：说明缺少什么内容，路由到实现模式（Plan 已完成一轮澄清，不再回 Plan 循环）\n"
+            "\n"
+            "**本步必须输出路由决策，说明下一步进入哪个模式。不允许只输出文字而不提交决策。**\n"
             "\n"
             "**1 步内必须做出决策。**"
         )
