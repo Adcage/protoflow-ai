@@ -14,6 +14,7 @@ import com.adcage.acaicodefree.config.properties.ScreenshotProperties;
 import com.adcage.acaicodefree.config.properties.WorkspaceProperties;
 import com.adcage.acaicodefree.constant.AppConstant;
 import com.adcage.acaicodefree.constant.UserConstant;
+import com.adcage.acaicodefree.core.artifact.ArtifactManifestReader;
 import com.adcage.acaicodefree.core.build.VueProjectBuildService;
 import com.adcage.acaicodefree.core.build.VueProjectBuildService.BuildResult;
 import com.adcage.acaicodefree.core.handler.StreamHandlerExecutor;
@@ -29,6 +30,7 @@ import com.adcage.acaicodefree.model.entity.ChatHistory;
 import com.adcage.acaicodefree.model.entity.ChatSession;
 import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.vo.app.AppVO;
+import com.adcage.acaicodefree.model.vo.app.ArtifactManifestVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatHistoryVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatSessionVO;
 import com.adcage.acaicodefree.model.vo.chat.ToolEventVO;
@@ -125,6 +127,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private WorkspaceProperties workspaceProperties;
 
+    @Resource
+    private ArtifactManifestReader artifactManifestReader;
+
     @Value("${server.port:8700}")
     private String serverPort;
 
@@ -142,6 +147,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));//TODO 后续优化成AI生成应用名称
         app.setInitPrompt(initPrompt);
         app.setCodeGenType(codeGenTypeEnum.getValue());
+        app.setGenerationMode(StrUtil.blankToDefault(appAddRequest.getGenerationMode(), "application"));
         app.setStyleTemplate(appAddRequest.getStyleTemplate());
         app.setUserId(loginUser.getId());
         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
@@ -245,6 +251,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             appVO.setUser(userVO);
         }
         appendCoverTaskState(appVO, app.getId());
+        enrichFromManifest(appVO, app);
         return appVO;
     }
 
@@ -310,11 +317,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             );
             log.info("resuming paused agent_run, sessionId={}, agentRunId={}", sessionId, agentRunId);
         } else {
-            ThrowUtils.throwIf(
-                    agentRunService.hasRunningRun(appId, sessionId, loginUser.getId()),
-                    ErrorCode.OPERATION_ERROR,
-                    "当前会话正在生成，请勿重复提交"
-            );
+            if (agentRunService.hasRunningRun(appId, sessionId, loginUser.getId())) {
+                log.warn("发现上一个 agent_run 未正常结束，自动标记为失败，sessionId={}", sessionId);
+                agentRunService.failRunningRun(appId, sessionId, loginUser.getId(), "连接中断，用户重新提交");
+            }
             ModelConfig modelConfig = modelConfigService.getDefaultEnabledModelConfig(loginUser.getId());
             modelConfigId = modelConfig == null ? null : modelConfig.getId();
             configVersion = modelConfig == null ? null : modelConfig.getConfigVersion();
@@ -341,6 +347,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 .app(app)
                 .loginUser(loginUser)
                 .codeGenTypeEnum(codeGenTypeEnum)
+                .generationMode(app.getGenerationMode())
                 .modelConfigId(modelConfigId)
                 .configVersion(configVersion)
                 .workspacePath(workspacePath)
@@ -698,6 +705,54 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         appVO.setCoverTaskStatus((String) state.getOrDefault("status", ""));
         appVO.setCoverRetryCount((Integer) state.getOrDefault("retryCount", 0));
         appVO.setCoverErrorMessage((String) state.getOrDefault("errorMessage", ""));
+    }
+
+    private void enrichFromManifest(AppVO appVO, App app) {
+        if (app.getId() == null || app.getCodeGenType() == null) {
+            return;
+        }
+        try {
+            Path workspaceRoot = resolveAppWorkspaceRoot(app);
+            if (workspaceRoot == null) {
+                return;
+            }
+            ArtifactManifestVO manifest = artifactManifestReader.readManifest(workspaceRoot);
+            if (manifest != null) {
+                appVO.setArtifactFormat(manifest.getArtifactFormat());
+                appVO.setPreviewUrl(computePreviewUrl(app, manifest));
+            }
+        } catch (Exception e) {
+            log.debug("读取 Manifest 失败，跳过 manifest 补充, appId={}", app.getId(), e);
+        }
+    }
+
+    private Path resolveAppWorkspaceRoot(App app) {
+        String codeGenType = app.getCodeGenType();
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        if (codeGenTypeEnum == null) {
+            return null;
+        }
+        Path workspaceDir = Path.of(workspaceProperties.getAgentWorkspaceDir()).toAbsolutePath().normalize();
+        Path appDir = workspaceDir.resolve(getCodeGenOutputPrefix(codeGenTypeEnum)).resolve(String.valueOf(app.getId()));
+        if (!Files.exists(appDir)) {
+            return null;
+        }
+        return appDir;
+    }
+
+    private String computePreviewUrl(App app, ArtifactManifestVO manifest) {
+        String deployKey = app.getDeployKey();
+        if (StrUtil.isNotBlank(deployKey)) {
+            return buildDeployUrl(deployKey);
+        }
+        String artifactFormat = manifest.getArtifactFormat();
+        if (artifactFormat == null) {
+            return null;
+        }
+        return switch (artifactFormat) {
+            case "vue_project", "web_multi_file", "web_single_file" -> null;
+            default -> null;
+        };
     }
 
     private void updateCoverTaskState(Long appId, String status, Integer retryCount, String errorMessage) {

@@ -2,6 +2,7 @@ package com.adcage.acaicodefree.grpc.client;
 
 import com.adcage.acaicodefree.grpc.codegen.*;
 import com.adcage.acaicodefree.grpc.common.*;
+import com.adcage.acaicodefree.grpc.common.GenerationMode;
 import com.adcage.acaicodefree.ai.model.message.AiResponseMessage;
 import com.adcage.acaicodefree.ai.model.message.StreamMessage;
 import com.adcage.acaicodefree.ai.model.message.ToolRequestMessage;
@@ -100,6 +101,12 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
             builder.setCodeGenType(mapJavaCodeGenTypeStr(request.getApp().getCodeGenType()));
         }
 
+        if (request.getGenerationMode() != null) {
+            builder.setGenerationMode(mapGenerationMode(request.getGenerationMode()));
+        } else if (request.getApp() != null && request.getApp().getGenerationMode() != null) {
+            builder.setGenerationMode(mapGenerationMode(request.getApp().getGenerationMode()));
+        }
+
         return builder.build();
     }
 
@@ -118,6 +125,14 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
             case "multi-file" -> CodeGenType.MULTI_FILE;
             case "vue_project" -> CodeGenType.VUE_PROJECT;
             default -> CodeGenType.VUE_PROJECT;
+        };
+    }
+
+    private GenerationMode mapGenerationMode(String mode) {
+        if (mode == null || mode.isBlank()) return GenerationMode.APPLICATION;
+        return switch (mode.toLowerCase()) {
+            case "application" -> GenerationMode.APPLICATION;
+            default -> GenerationMode.GENERATION_MODE_UNSPECIFIED;
         };
     }
 

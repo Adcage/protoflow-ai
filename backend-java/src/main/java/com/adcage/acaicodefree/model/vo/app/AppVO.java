@@ -40,6 +40,21 @@ public class AppVO implements Serializable {
     private String codeGenType;
 
     /**
+     * 生成模式（application/presentation/prototype/diagram）
+     */
+    private String generationMode;
+
+    /**
+     * 产物格式（从 Manifest 读取，如 web_single_file/web_multi_file/vue_project）
+     */
+    private String artifactFormat;
+
+    /**
+     * 预览 URL（服务端根据 artifactFormat 计算）
+     */
+    private String previewUrl;
+
+    /**
      * 风格模板
      */
     private String styleTemplate;
