@@ -1,8 +1,6 @@
-import pytest
-
 from app.prompts.modules import PromptModule
 from app.prompts.composer import PromptComposer
-from app.registries.prompt_module_registry import PromptModuleRegistry
+from app.prompts.registry import PromptModuleRegistry
 
 
 class _HelloModule(PromptModule):
@@ -51,24 +49,21 @@ class TestPromptComposer:
 
 
 class TestPromptModuleRegistry:
-    def test_register_and_ordered(self):
+    def test_register_and_module_ids(self):
         registry = PromptModuleRegistry()
         registry.register(_WorldModule())
         registry.register(_HelloModule())
-        modules = registry.ordered_modules()
-        assert modules[0].id == "world"
-        assert modules[1].id == "hello"
+        assert registry.module_ids == ["world", "hello"]
 
-    def test_duplicate_raises(self):
+    def test_duplicate_skipped(self):
         registry = PromptModuleRegistry()
         registry.register(_HelloModule())
-        with pytest.raises(ValueError, match="Duplicate"):
-            registry.register(_HelloModule())
+        registry.register(_HelloModule())
+        assert registry.module_ids == ["hello"]
 
     def test_get_not_found(self):
         registry = PromptModuleRegistry()
-        with pytest.raises(KeyError):
-            registry.get("missing")
+        assert registry.get_by_id("missing") is None
 
 
 class TestAgentLoopPromptBoundary:
@@ -79,14 +74,16 @@ class TestAgentLoopPromptBoundary:
         from app.runtime.orchestrator import RuntimeOrchestrator
 
         services = RuntimeOrchestrator()._build_services(EventBus(agent_run_id=1))
-        module_ids = [m.id for m in services.prompt_module_registry.ordered_modules()]
+        module_ids = services.prompt_module_registry.module_ids
 
         assert "chat_history_summary" not in module_ids
         assert "user_prompt" not in module_ids
 
-    def test_fallback_prompts_do_not_embed_current_user_prompt(self):
-        from app.agent_loop.prompts.implement import IMPLEMENT_MODE_SYSTEM_PROMPT
-        from app.agent_loop.prompts.plan import PLAN_MODE_SYSTEM_PROMPT
+    def test_profile_prompts_do_not_embed_current_user_prompt(self):
+        from app.prompts.profiles import PROMPT_PROFILES
 
-        assert "{user_prompt}" not in PLAN_MODE_SYSTEM_PROMPT
-        assert "{user_prompt}" not in IMPLEMENT_MODE_SYSTEM_PROMPT
+        for profile_name, module_ids in PROMPT_PROFILES.items():
+            for module_id in module_ids:
+                assert "{user_prompt}" not in module_id, (
+                    f"Profile {profile_name} module {module_id} 不应包含 {{user_prompt}} 占位符"
+                )

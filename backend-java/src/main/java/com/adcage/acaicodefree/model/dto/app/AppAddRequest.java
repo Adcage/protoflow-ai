@@ -23,6 +23,11 @@ public class AppAddRequest implements Serializable {
     private String codeGenType;
 
     /**
+     * 生成模式（application/presentation/prototype/diagram），默认 application
+     */
+    private String generationMode;
+
+    /**
      * 格模板
      */
     private String styleTemplate;

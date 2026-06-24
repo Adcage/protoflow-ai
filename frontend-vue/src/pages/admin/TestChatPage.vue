@@ -490,16 +490,26 @@ const doEnhanceInput = async (promptText: string) => {
 // Planning 事件处理
 async function handlePlanningSubmit(answers: Record<string, string>) {
   const PLANNING_TAG_RE = /<planning\s+type="(\w+)"\s*>([\s\S]*?)<\/planning>/
-  const pdList: { questions: { id: string; question: string }[] }[] = []
-  for (let i = 0; i < messages.value.length; i++) {
+  // 优先从结构化 planning 字段查找最新 clarification
+  let latest: { questionSetId?: string; questions: { id: string; question: string }[] } | null = null
+  for (let i = messages.value.length - 1; i >= 0; i--) {
     const msg = messages.value[i]
     if (msg.role !== 'ai') continue
+    if (msg.planning && msg.planning.questions.length > 0) {
+      latest = { questionSetId: msg.planning.questionSetId, questions: msg.planning.questions }
+      break
+    }
     const match = msg.content.match(PLANNING_TAG_RE)
     if (match && match[1] === 'clarification') {
-      try { pdList.push(JSON.parse(match[2])) } catch { /* skip */ }
+      try {
+        const data = JSON.parse(match[2])
+        latest = { questions: data.questions || [] }
+        break
+      } catch {
+        // skip
+      }
     }
   }
-  const latest = pdList[pdList.length - 1]
   if (!latest) return
   const answersList: string[] = []
   for (const q of latest.questions) {
@@ -542,13 +552,10 @@ function handlePlanningSkip(_index: number) {}
 // ======== 预览逻辑 ========
 
 async function updatePreview() {
-  const codeGenType = currentApp.value?.codeGenType || 'single_file'
   const appId = selectedAppId.value
   if (!appId) return
-  const deployUrlPrefix = import.meta.env.VITE_APP_DEPLOY_URL_PREFIX
   previewWarning.value = ''
 
-  // 检查是否有可预览的 AI 消息
   const latestAiMessage = [...messages.value].reverse().find((item) => item.role === 'ai')
   if (!latestAiMessage || latestAiMessage.status === 'failed') {
     iframeUrl.value = ''
@@ -559,20 +566,20 @@ async function updatePreview() {
     return
   }
 
+  const previewUrl = currentApp.value?.previewUrl
+  if (!previewUrl) {
+    iframeUrl.value = ''
+    previewStatus.value = 'failed'
+    previewWarning.value = '预览地址暂不可用'
+    return
+  }
+
+  const nextUrl = `${previewUrl}${previewUrl.includes('?') ? '&' : '?'}t=${Date.now()}`
   previewStatus.value = 'checking'
-  const nextUrl = buildPreviewUrl(codeGenType, deployUrlPrefix, appId)
   const resourceAvailable = await checkPreviewResource(nextUrl)
   if (resourceAvailable) {
     previewStatus.value = 'ready'
     iframeUrl.value = nextUrl
-    return
-  }
-  // 尝试降级路径
-  const fallbackUrl = `${deployUrlPrefix}/${codeGenType === 'vue_project' ? 'vue_project' : codeGenType}/${appId}/index.html?t=${Date.now()}`
-  const fallbackAvailable = await checkPreviewResource(fallbackUrl)
-  if (fallbackAvailable) {
-    previewStatus.value = 'ready'
-    iframeUrl.value = fallbackUrl
     return
   }
   iframeUrl.value = ''
@@ -580,15 +587,6 @@ async function updatePreview() {
   previewWarning.value = '预览资源不存在，通常是中间生成或构建失败导致目标文件未生成。'
 }
 
-const buildPreviewUrl = (codeGenType: string, deployUrlPrefix: string, appId: string) => {
-  if (codeGenType === 'vue_project') {
-    return `${deployUrlPrefix}/vue_project/${appId}/dist/index.html?t=${Date.now()}`
-  }
-  if (codeGenType === 'multi-file') {
-    return `${deployUrlPrefix}/multi-file/${appId}/dist/index.html?t=${Date.now()}`
-  }
-  return `${deployUrlPrefix}/${codeGenType}/${appId}/index.html?t=${Date.now()}`
-}
 
 const checkPreviewResource = async (url: string) => {
   try {

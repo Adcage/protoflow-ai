@@ -1,12 +1,22 @@
 import logging
 
 from app.agent_loop.state import AgentLoopState
+from app.agent_loop.state_v2 import ArtifactTypeState
 from app.capabilities.common.asset_index import AssetIndex
 from app.modeling.roles import ModelRole
 from app.runtime.context import ExecutionContext
 from app.runtime.services import RuntimeServices
 
 logger = logging.getLogger("app.agent_loop.nodes.init")
+
+
+def _model_config_incomplete(resolved_model: dict | None) -> bool:
+    if not resolved_model:
+        return True
+    return not all(
+        resolved_model.get(key)
+        for key in ("provider", "modelName", "apiKey")
+    )
 
 
 class InitNode:
@@ -32,7 +42,7 @@ class InitNode:
                 except Exception as e:
                     logger.warning("init | asset loading failed on resume: %s", e)
 
-            if self._services.model_resolver is not None and state.resolved_model is None:
+            if self._services.model_resolver is not None and _model_config_incomplete(state.resolved_model):
                 try:
                     await self._services.model_resolver.load_bundle(self._context)
                     model_config = self._services.model_resolver.resolve(ModelRole.PRIMARY)
@@ -69,6 +79,21 @@ class InitNode:
 
         state.mode = "plan"
         state.status = "running"
+
+        code_gen_type_str = getattr(self._context.code_gen_type, "value", str(self._context.code_gen_type))
+        state.artifact_type_state = ArtifactTypeState(
+            requested=code_gen_type_str,
+            effective=code_gen_type_str,
+        )
+
+        generation_mode = getattr(self._context, "generation_mode", None)
+        if generation_mode is None:
+            from app.runtime.context import _CODE_GEN_TYPE_TO_GENERATION_MODE
+            generation_mode = _CODE_GEN_TYPE_TO_GENERATION_MODE.get(code_gen_type_str, "application")
+
+        envelope = getattr(state, "_state_envelope", None)
+        if envelope is not None:
+            envelope.workflow.generation_mode = generation_mode
 
         asset_manager = self._services.asset_manager
         if asset_manager is not None:

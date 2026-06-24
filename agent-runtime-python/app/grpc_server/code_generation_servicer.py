@@ -53,21 +53,6 @@ class CodeGenerationServicer(code_generation_pb2_grpc.CodeGenerationServiceServi
                 error=common_pb2.ErrorData(message=str(e), code=AgentErrorCode.INTERNAL_ERROR),
             )
 
-    async def RouteCodeGenType(self, request, context):
-        prompt = request.prompt.lower() if request.prompt else ""
-        vue_keywords = ["vue", "项目", "多页面", "后台", "管理系统", "dashboard"]
-        multi_keywords = ["多个文件", "css", "js", "multi"]
-
-        if any(kw in prompt for kw in vue_keywords):
-            code_gen_type = common_pb2.VUE_PROJECT
-        elif any(kw in prompt for kw in multi_keywords):
-            code_gen_type = common_pb2.MULTI_FILE
-        else:
-            code_gen_type = common_pb2.SINGLE_FILE
-
-        logger.info("RouteCodeGenType | promptLen=%d result=%s", len(request.prompt), code_gen_type)
-        return code_generation_pb2.RouteCodeGenTypeResponse(code_gen_type=code_gen_type)
-
     async def ValidatePrompt(self, request, context):
         prompt = request.prompt
         if not prompt or len(prompt.strip()) == 0:

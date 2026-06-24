@@ -8,7 +8,6 @@ from app.modeling.resolver import ResolvedModelConfig, ModelRole
 from app.nodes.prepare_context import PrepareContextNode
 from app.nodes.classify_task import ClassifyTaskNode
 from app.nodes.resolve_model import ResolveModelNode
-from app.nodes.compose_prompt import ComposePromptNode
 from app.nodes.execute_tools import ExecuteToolsNode
 from app.nodes.finalize import FinalizeNode
 from app.runtime.context import CodeGenType, ExecutionContext, RunMode
@@ -110,18 +109,6 @@ class TestResolveModelNode:
         assert result.resolved_model is not None
         assert result.resolved_model["modelName"] == "gpt-4o"
         assert result.selected_model_role == ModelRole.PRIMARY
-
-
-class TestComposePromptNode:
-    @pytest.mark.asyncio
-    async def test_composes_messages(self):
-        node = ComposePromptNode()
-        ctx = _make_context()
-        state = ExecutionState()
-        services = _make_services()
-        result = await node.run(ctx, state, services)
-        assert len(result.prompt_messages) >= 1
-        assert result.prompt_messages[-1]["role"] == "user"
 
 
 class TestExecuteToolsNode:

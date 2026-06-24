@@ -187,6 +187,61 @@ class LlmAuditWriter:
             except Exception as e:
                 logger.warning("llm_audit write error: %s", e)
 
+    def _split_long_string(self, text: str, width: int = 120) -> str:
+        """按宽度切分长字符串，保留原始换行；方便 JSON 文本字段逐行展示。"""
+        if not text:
+            return ""
+        out_lines: list[str] = []
+        for line in text.split("\n"):
+            if len(line) <= width:
+                out_lines.append(line)
+                continue
+            i = 0
+            n = len(line)
+            while i < n:
+                out_lines.append(line[i:i + width])
+                i += width
+        return "\n".join(out_lines)
+
+    def _build_json_payload(self, record: AuditRecord) -> dict[str, Any]:
+        """构造结构化的 JSON 数据，长文本字段按行切分便于查看。"""
+        messages = []
+        for msg in record.messages:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            messages.append({
+                "role": role,
+                "length": len(content),
+                "content": self._split_long_string(content, width=120),
+            })
+
+        tools = []
+        for tool in record.tools:
+            if isinstance(tool, dict) and tool.get("type") == "function":
+                func = tool.get("function", {})
+                tools.append({
+                    "type": "function",
+                    "name": func.get("name", ""),
+                    "description": self._split_long_string(
+                        func.get("description", ""), width=120
+                    ),
+                    "parameters": func.get("parameters", {}),
+                })
+            else:
+                tools.append(tool)
+
+        return {
+            "trace_id": record.trace_id,
+            "agent_run_id": record.agent_run_id,
+            "timestamp": record.timestamp,
+            "model": record.model,
+            "provider": record.source,
+            "base_url": record.base_url,
+            "api_key_prefix": record.api_key_prefix,
+            "messages": messages,
+            "tools": tools,
+        }
+
     async def _write_record(self, record: AuditRecord) -> None:
         run_id = record.agent_run_id or record.trace_id or "unknown"
 
@@ -194,7 +249,7 @@ class LlmAuditWriter:
         if key not in self._first_timestamp:
             self._first_timestamp[key] = record.timestamp
 
-        dt = datetime.fromisoformat(self._first_timestamp[key])
+        dt = datetime.fromisoformat(self._first_timestamp[key]).astimezone()
         date_str = dt.strftime("%Y-%m-%d")
         hm = dt.strftime("%H%M")
         output_dir = self._base_dir / date_str / f"{hm}_{run_id}"
@@ -207,17 +262,7 @@ class LlmAuditWriter:
         json_path = output_dir / f"{seq:02d}_call.json"
         md_path = output_dir / f"{seq:02d}_call.md"
 
-        json_data = {
-            "trace_id": record.trace_id,
-            "agent_run_id": record.agent_run_id,
-            "timestamp": record.timestamp,
-            "model": record.model,
-            "provider": record.source,
-            "base_url": record.base_url,
-            "api_key_prefix": record.api_key_prefix,
-            "messages": record.messages,
-            "tools": record.tools,
-        }
+        json_data = self._build_json_payload(record)
 
         async with aiofiles.open(json_path, "w", encoding="utf-8") as f:
             await f.write(json.dumps(json_data, ensure_ascii=False, indent=2))
@@ -236,6 +281,26 @@ class LlmAuditWriter:
             }
             async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(index_data, ensure_ascii=False, indent=2))
+
+    def _wrap_long_text(self, text: str, width: int = 100) -> str:
+        """将长行按宽度软换行（按 Markdown 友好的方式插入零宽软换）。"""
+        if not text:
+            return ""
+        if width <= 0:
+            return text
+        out_lines: list[str] = []
+        for line in text.split("\n"):
+            if len(line) <= width:
+                out_lines.append(line)
+                continue
+            chunks = []
+            i = 0
+            n = len(line)
+            while i < n:
+                chunks.append(line[i:i + width])
+                i += width
+            out_lines.append("\\\n".join(chunks))
+        return "\n".join(out_lines)
 
     def _render_md(self, record: AuditRecord, seq: int) -> str:
         lines = [
@@ -256,12 +321,9 @@ class LlmAuditWriter:
             content = msg.get("content", "")
             lines.append(f"### [{i + 1}] {role} ({len(content)} 字符)")
             lines.append("")
-            lines.append("<details>")
-            lines.append("<summary>展开完整内容</summary>")
-            lines.append("")
-            lines.append(content)
-            lines.append("")
-            lines.append("</details>")
+            lines.append("```text")
+            lines.append(self._wrap_long_text(content, width=100))
+            lines.append("```")
             lines.append("")
 
         if record.tools:
@@ -278,9 +340,12 @@ class LlmAuditWriter:
                     lines.append(f"### [{j + 1}] {name}")
                     lines.append("")
                     if desc:
-                        lines.append(f"**描述:** {desc}")
+                        lines.append("**描述:**")
+                        lines.append("")
+                        lines.append(self._wrap_long_text(desc, width=100))
                         lines.append("")
                     lines.append("**参数:**")
+                    lines.append("")
                     lines.append("```json")
                     lines.append(json.dumps(params, ensure_ascii=False, indent=2))
                     lines.append("```")

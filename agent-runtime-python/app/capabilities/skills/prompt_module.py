@@ -35,8 +35,10 @@ class SelectedSkillModule(PromptModule):
             sections.append("")
             sections.append("## Skill 可用资源")
             sections.append("")
-            sections.append('使用 read_file(path, scope="skill") 按需读取以下文件：')
+            sections.append("如需参考布局/清单，按需读取以下文件：")
             for ref in skill.references:
                 sections.append(f"  - {ref}")
+            sections.append("")
+            sections.append("**注意：不要逐个读取所有参考文件，只按需读取最相关的 1-2 个。**")
 
         return "\n".join(sections)

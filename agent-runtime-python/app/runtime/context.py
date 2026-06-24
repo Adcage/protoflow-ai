@@ -9,6 +9,13 @@ class CodeGenType(str, Enum):
     VUE_PROJECT = "vue_project"
 
 
+_CODE_GEN_TYPE_TO_GENERATION_MODE: dict[str, str] = {
+    "single_file": "application",
+    "multi-file": "application",
+    "vue_project": "application",
+}
+
+
 class RunMode(str, Enum):
     GENERATE = "generate"
     MODIFY = "modify"
@@ -47,3 +54,4 @@ class ExecutionContext:
     runtime_options: dict[str, Any] = field(default_factory=dict)
     is_test: bool = False
     is_resume: bool = False
+    generation_mode: str | None = None

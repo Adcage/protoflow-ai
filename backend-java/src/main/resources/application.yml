@@ -1,6 +1,6 @@
 spring:
   application:
-    name: ac-ai-code-free-backend
+    name: protoflow-ai-backend
   # redis
   data:
     redis:

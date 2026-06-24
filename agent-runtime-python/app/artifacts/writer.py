@@ -6,8 +6,9 @@ from app.artifacts.types import ArtifactCheckResult, ArtifactManifest
 
 logger = logging.getLogger("app.artifacts.writer")
 
-_CAMEL_MAP: dict[str, str] = {
-    "code_gen_type": "codeGenType",
+_V2_CAMEL_MAP: dict[str, str] = {
+    "generation_mode": "generationMode",
+    "artifact_format": "artifactFormat",
     "supporting_files": "supportingFiles",
     "source_skill_id": "sourceSkillId",
     "source_skill_ids": "sourceSkillIds",
@@ -20,16 +21,24 @@ _CAMEL_MAP: dict[str, str] = {
     "project_mode": "projectMode",
 }
 
-_CAMEL_MAP_CHECK: dict[str, str] = {}
+_V2_EXCLUDED_FIELDS: frozenset[str] = frozenset({"code_gen_type"})
+
+_V1_CODE_GEN_TYPE_MAP: dict[str, tuple[str, str]] = {
+    "single_file": ("application", "web_single_file"),
+    "multi-file": ("application", "web_multi_file"),
+    "vue_project": ("application", "vue_project"),
+}
 
 
 def _to_camel(key: str) -> str:
-    return _CAMEL_MAP.get(key, key)
+    return _V2_CAMEL_MAP.get(key, key)
 
 
 def _manifest_to_dict(manifest: ArtifactManifest) -> dict:
     result = {}
     for f in manifest.__dataclass_fields__:
+        if f in _V2_EXCLUDED_FIELDS:
+            continue
         val = getattr(manifest, f)
         camel_key = _to_camel(f)
         if f == "checks":
@@ -70,6 +79,7 @@ class ArtifactWriter:
 
 
 def _dict_to_manifest(data: dict) -> ArtifactManifest:
+    version = data.get("version", 1)
     checks = []
     for c in data.get("checks", []):
         checks.append(
@@ -80,12 +90,25 @@ def _dict_to_manifest(data: dict) -> ArtifactManifest:
                 severity=c.get("severity", ""),
             )
         )
+
+    generation_mode = data.get("generationMode", data.get("generation_mode", ""))
+    artifact_format = data.get("artifactFormat", data.get("artifact_format", ""))
+    code_gen_type = data.get("codeGenType", data.get("code_gen_type", ""))
+
+    if version < 2 and code_gen_type and not artifact_format:
+        mapped = _V1_CODE_GEN_TYPE_MAP.get(code_gen_type)
+        if mapped:
+            generation_mode = generation_mode or mapped[0]
+            artifact_format = mapped[1]
+
     return ArtifactManifest(
-        version=data.get("version", 1),
+        version=max(version, 2),
         kind=data.get("kind", ""),
         title=data.get("title", ""),
         entry=data.get("entry", ""),
-        code_gen_type=data.get("codeGenType", data.get("code_gen_type", "")),
+        generation_mode=generation_mode or "application",
+        artifact_format=artifact_format,
+        code_gen_type=code_gen_type,
         supporting_files=data.get("supportingFiles", data.get("supporting_files", [])),
         status=data.get("status", "complete"),
         source_skill_id=data.get("sourceSkillId", data.get("source_skill_id", "")),

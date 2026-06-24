@@ -1,21 +1,24 @@
 import logging
+import uuid
 
 from langchain_core.tools import BaseTool
 
 from app.agent_loop.nodes.step_base import (
-    _build_tool_handlers,
     _create_terminal_tools_for_mode,
     _execute_single_step,
-    _format_tool_list,
     _get_assets_dir,
     _get_skill_dir,
     _make_loop_tools,
 )
-from app.agent_loop.prompts.plan import PLAN_MODE_SYSTEM_PROMPT
-from app.agent_loop.prompts.implement import IMPLEMENT_MODE_SYSTEM_PROMPT
-from app.agent_loop.prompts.plan_spec import PLAN_SPEC
 from app.agent_loop.state import AgentLoopState
+from app.agent_loop.state_v2 import PlanStateV2
+from app.agent_loop.tool_policy import AgentMode
+from app.agent_loop.tool_resolver import ModeToolResolver
+from app.capabilities.skills.selector import SkillRegistryProvider
+from app.core.error_codes import AgentErrorCode
+from app.core.exceptions import AgentRuntimeError
 from app.prompts.composer import PromptComposer
+from app.prompts.profiles import PROMPT_PROFILES, resolve_profile_module_ids
 from app.runtime.context import ExecutionContext
 from app.runtime.events import RuntimeEvent, RuntimeEventType
 from app.runtime.services import RuntimeServices
@@ -29,26 +32,58 @@ def _compose_system_prompt(
     state: AgentLoopState,
     context: ExecutionContext,
     services: RuntimeServices,
-    lc_tools: list[BaseTool],
-    fallback_prompt: str,
+    toolset,
+    profile_id: str,
 ) -> str:
-    """使用 PromptComposer 构建系统提示词，若 registry 不可用则回退到硬编码提示词。"""
+    """使用 PromptComposer + profile 构建系统提示词。接收已解析的 toolset 避免重复解析。"""
     registry = getattr(services, "prompt_module_registry", None)
     if registry is None:
-        return fallback_prompt
+        raise AgentRuntimeError(
+            "PromptModuleRegistry 不可用",
+            code=AgentErrorCode.STATE_ERROR,
+        )
 
-    # 注入工具列表到 ToolListModule
-    tool_list_module = registry.get_by_id("tool_list")
-    if tool_list_module is not None:
-        tool_list_module.set_tools(lc_tools)
+    profile_module_ids = PROMPT_PROFILES.get(profile_id)
+    if profile_module_ids is None:
+        raise AgentRuntimeError(
+            f"Profile {profile_id} 不存在",
+            code=AgentErrorCode.STATE_ERROR,
+        )
 
-    composer = PromptComposer(registry.ordered_modules())
-    messages = composer.compose(context, state)
+    generation_mode = getattr(state, "generation_mode", None)
+    if generation_mode is None:
+        envelope = getattr(state, "_state_envelope", None)
+        if envelope is not None:
+            generation_mode = getattr(envelope.workflow, "generation_mode", None)
 
+    mode_registry = getattr(services, "generation_mode_registry", None)
+    profile_module_ids = resolve_profile_module_ids(
+        profile_id,
+        generation_mode=generation_mode,
+        mode_registry=mode_registry,
+    )
+
+    modules = registry.require_many(profile_module_ids)
+    composer = PromptComposer(modules)
+    messages = composer.compose(context, state, toolset)
     if messages and messages[0].get("role") == "system":
         return messages[0]["content"]
 
-    return fallback_prompt
+    raise AgentRuntimeError(
+        "PromptComposer 未能生成系统提示词",
+        code=AgentErrorCode.STATE_ERROR,
+    )
+
+
+def _ensure_plan_envelope(state: AgentLoopState) -> PlanStateV2:
+    envelope = getattr(state, "_state_envelope", None)
+    if envelope is None:
+        envelope = state._to_envelope()
+        state._state_envelope = envelope
+    plan_state: PlanStateV2 = envelope.workflow.plan
+    if not plan_state.plan_session_id:
+        plan_state.plan_session_id = f"plan_{uuid.uuid4().hex[:12]}"
+    return plan_state
 
 
 class PlanStepNode:
@@ -57,6 +92,20 @@ class PlanStepNode:
         self._services = services
 
     async def __call__(self, state: AgentLoopState) -> AgentLoopState:
+        plan_state = _ensure_plan_envelope(state)
+        plan_state.increment_model_call()
+
+        if plan_state.reached_hard_limit():
+            state.status = "failed"
+            await self._services.event_bus.emit(
+                RuntimeEvent(
+                    RuntimeEventType.STATUS,
+                    {"message": "Plan 调用硬上限已到；进入 blocked 状态"},
+                )
+            )
+            plan_state.plan_stage = "blocked"
+            return state
+
         await self._services.event_bus.emit(
             RuntimeEvent(RuntimeEventType.STATUS, {"message": f"Plan step {state.iteration + 1}"})
         )
@@ -88,122 +137,64 @@ class PlanStepNode:
 
         lc_tools.append(ReadAssetTool(file_tools=file_tools))
 
-        lc_tools.extend(_make_loop_tools(state, self._services.event_bus))
+        loop_tools = _make_loop_tools(state, self._services.event_bus)
+        # 为 ChooseSkillTool 注入 SkillRegistryProvider（Plan 阶段专用）
+        provider = build_skill_registry_provider(state)
+        if provider is not None:
+            for tool in loop_tools:
+                if tool.name == "choose_skill":
+                    setattr(tool, "_skill_registry_provider", provider)
+                    break
+        lc_tools.extend(loop_tools)
 
-        tool_handlers = _build_tool_handlers(file_tools, terminal_tools)
-        tool_handlers.pop("write_file", None)
+        toolset = ModeToolResolver.resolve(AgentMode.PLAN, lc_tools)
 
-        # 构建回退用的硬编码提示词
-        fallback_prompt = PLAN_MODE_SYSTEM_PROMPT.format(
-            tool_list=_format_tool_list(lc_tools),
-            plan_spec=PLAN_SPEC,
-        )
-        caps_text = ""
-        if state.selected_capabilities and getattr(state.selected_capabilities, "skill", None):
-            skill = state.selected_capabilities.skill
-            skill_dir_str = str(skill.source_path.parent)
-            caps_text = f"\n\n## 已选择的 Skill\n\n**{skill.name}** (ID: {skill.id}): {skill.description}\n\nSkill 目录: `{skill_dir_str}`\n\n你可以用 `read_asset(relative_path='skills/{skill.id}/SKILL.md')` 读取详细规则，或用 `run_command` 执行 `{skill_dir_str}/scripts/search.py` 等脚本。"
-        else:
-            index = getattr(state, "_asset_index", None)
-            if index is not None:
-                skills = index.skill_registry.all()
-                if skills:
-                    caps_text = "\n\n## 可用 Skill 列表\n\n你可以使用 `select_skill(skill_id, reason)` 选择一个适合当前任务的 Skill。\n\n"
-                    for s in skills:
-                        caps_text += f"- **{s.id}**: {s.description}\n"
-        fallback_prompt += caps_text
-
-        # 使用 PromptComposer 或回退
         system_prompt = _compose_system_prompt(
-            state, self._context, self._services, lc_tools, fallback_prompt
+            state, self._context, self._services, toolset,
+            profile_id="plan",
         )
 
-        state.plan_iterations += 1
         logger.info(
-            "plan_step | iteration=%d plan_iterations=%d mode=%s",
+            "plan_step | iteration=%d model_call_count=%d mode=%s stage=%s session=%s",
             state.iteration + 1,
-            state.plan_iterations,
+            plan_state.model_call_count,
             state.mode,
+            plan_state.plan_stage,
+            plan_state.plan_session_id,
         )
-
-        return await _execute_single_step(
-            state,
-            self._context,
-            self._services,
-            system_prompt,
-            lc_tools,
-            tool_handlers,
-            file_tools,
-        )
-
-
-class ImplementStepNode:
-    def __init__(self, context: ExecutionContext, services: RuntimeServices):
-        self._context = context
-        self._services = services
-
-    async def __call__(self, state: AgentLoopState) -> AgentLoopState:
-        await self._services.event_bus.emit(
-            RuntimeEvent(
-                RuntimeEventType.STATUS, {"message": f"Implement step {state.iteration + 1}"}
-            )
-        )
-
-        workspace = Workspace(self._context.workspace_path)
-        skill_dir = _get_skill_dir(state)
-        assets_dir = _get_assets_dir(state)
-        file_tools = FileTools(workspace, skill_dir=skill_dir, assets_dir=assets_dir)
-
-        terminal_tools = _create_terminal_tools_for_mode(workspace, readonly=False)
-
-        from app.tools.langchain_tools import create_all_tools
-
-        lc_tools: list[BaseTool] = create_all_tools(file_tools, terminal_tools=terminal_tools)
-        from app.tools.langchain_tools import ReadAssetTool
-
-        lc_tools.append(ReadAssetTool(file_tools=file_tools))
-        lc_tools.extend(_make_loop_tools(state, self._services.event_bus))
-
-        tool_handlers = _build_tool_handlers(file_tools, terminal_tools)
-
-        # 构建回退用的硬编码提示词
-        outline_text = "暂无实现规划"
-        if state.implementation_outline:
-            if isinstance(state.implementation_outline, dict):
-                outline_text = state.implementation_outline.get("text", str(state.implementation_outline))
-            else:
-                outline_text = str(state.implementation_outline)
-
-        fallback_prompt = IMPLEMENT_MODE_SYSTEM_PROMPT.format(
-            tool_list=_format_tool_list(lc_tools),
-            implementation_outline=outline_text,
-        )
-        if state.selected_capabilities and getattr(state.selected_capabilities, "skill", None):
-            skill = state.selected_capabilities.skill
-            skill_dir_str = str(skill.source_path.parent)
-            skill_text = f"\n\n## 已选择的 Skill\n\n**{skill.name}** (ID: {skill.id}): {skill.description}\n\nSkill 目录: `{skill_dir_str}`\n\n你可以用 `read_asset(relative_path='skills/{skill.id}/SKILL.md')` 读取详细规则，或用 `run_command` 执行 `{skill_dir_str}/scripts/search.py` 等脚本。"
-            fallback_prompt += skill_text
-
-        # 使用 PromptComposer 或回退
-        system_prompt = _compose_system_prompt(
-            state, self._context, self._services, lc_tools, fallback_prompt
-        )
-
-        logger.info("implement_step | iteration=%d mode=%s", state.iteration + 1, state.mode)
 
         result = await _execute_single_step(
             state,
             self._context,
             self._services,
             system_prompt,
-            lc_tools,
-            tool_handlers,
+            toolset,
             file_tools,
         )
 
-        # implement 完成后标记，供 route_step 判断
-        if result.status == "running":
-            result.implement_just_finished = True
-            result.validate_just_finished = False
-
+        PlanStepNode.apply_exit_transition(result)
         return result
+
+    @staticmethod
+    def apply_exit_transition(state: AgentLoopState) -> None:
+        if not getattr(state, "plan_just_finished", False):
+            return
+        from app.agent_loop.graph import _ensure_execution_contract_after_plan
+        from app.agent_loop.transition import apply_workflow_transition
+
+        _ensure_execution_contract_after_plan(state)
+        apply_workflow_transition(
+            state,
+            source="plan",
+            target="implement",
+            reason_code="plan_completed",
+        )
+        if hasattr(state, "record_phase_report"):
+            state.record_phase_report()
+
+
+def build_skill_registry_provider(state: AgentLoopState) -> SkillRegistryProvider | None:
+    index = getattr(state, "_asset_index", None)
+    if index is None:
+        return None
+    return SkillRegistryProvider(index.skill_registry)

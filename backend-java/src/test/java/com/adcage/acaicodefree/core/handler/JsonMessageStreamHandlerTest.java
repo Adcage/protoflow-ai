@@ -56,6 +56,46 @@ class JsonMessageStreamHandlerTest {
         Assertions.assertTrue(readable.toString().contains("[工具完成] 已写入文件 src/main.js"));
     }
 
+    @Test
+    void jsonMessageHandlerShouldForwardAskUserToolRequestAsIs() {
+        JsonMessageStreamHandler handler = createHandler();
+        StringBuilder readable = new StringBuilder();
+
+        String askUserArgs = "{\"protocolVersion\":1,\"questionSetId\":\"qs_discover_direction_abc\"," +
+                "\"stage\":\"discover_direction\",\"questions\":[" +
+                "{\"id\":\"q1\",\"prompt\":\"应用方向？\",\"inputType\":\"single_select\"," +
+                "\"required\":true,\"options\":[{\"id\":\"a\",\"label\":\"A\"}]}]}";
+
+        List<String> output = handler.handle(Flux.just(
+                JSONUtil.toJsonStr(new ToolRequestMessage("qs_discover_direction_abc", "ask_user", askUserArgs))
+        ), readable).collectList().block();
+
+        Assertions.assertNotNull(output);
+        Assertions.assertEquals(1, output.size());
+        // arguments 必须原样透传：questionSetId、protocolVersion、questions 都保留
+        Assertions.assertTrue(output.get(0).contains("\"name\":\"ask_user\""));
+        Assertions.assertTrue(output.get(0).contains("\"id\":\"qs_discover_direction_abc\""));
+        Assertions.assertTrue(output.get(0).contains("\"protocolVersion\":1"));
+        Assertions.assertTrue(output.get(0).contains("\"questionSetId\":\"qs_discover_direction_abc\""));
+        Assertions.assertTrue(output.get(0).contains("\"id\":\"q1\""));
+    }
+
+    @Test
+    void jsonMessageHandlerShouldNotProduceAiResponseForAskUserToolExecuted() {
+        JsonMessageStreamHandler handler = createHandler();
+        StringBuilder readable = new StringBuilder();
+
+        List<String> output = handler.handle(Flux.just(
+                JSONUtil.toJsonStr(new ToolExecutedMessage(
+                        "qs_abc", "ask_user", "{}", "已向用户提问"))
+        ), readable).collectList().block();
+
+        Assertions.assertNotNull(output);
+        // ask_user 的 TOOL_EXECUTED 不能再被识别为 AI_RESPONSE 气泡
+        Assertions.assertFalse(readable.toString().contains("已向用户提问"),
+                "ask_user TOOL_EXECUTED 不应在 readable 中产生新气泡");
+    }
+
     private JsonMessageStreamHandler createHandler() {
         JsonMessageStreamHandler handler = new JsonMessageStreamHandler();
         FileOperationService fileOperationService = new FileOperationService();

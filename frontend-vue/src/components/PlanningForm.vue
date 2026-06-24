@@ -17,11 +17,11 @@
         <template v-if="currentQuestion.inputType === 'single_select'">
           <div
             v-for="opt in currentQuestion.options"
-            :key="opt.value"
-            :class="['option-card', { selected: currentAnswer === opt.value, disabled: isReadonly }]"
-            @click="!isReadonly && (currentAnswer = opt.value)"
+            :key="optionKey(opt)"
+            :class="['option-card', { selected: isSelected(opt), disabled: isReadonly }]"
+            @click="!isReadonly && selectOption(opt)"
           >
-            <span :class="['radio-dot', { active: currentAnswer === opt.value }]" />
+            <span :class="['radio-dot', { active: isSelected(opt) }]" />
             <div class="option-content">
               <div class="option-label">
                 {{ opt.label }}
@@ -35,11 +35,11 @@
         <template v-else-if="currentQuestion.inputType === 'multi_select'">
           <div
             v-for="opt in currentQuestion.options"
-            :key="opt.value"
-            :class="['option-card', { selected: multiSelected.includes(opt.value), disabled: isReadonly }]"
-            @click="!isReadonly && toggleMulti(opt.value)"
+            :key="optionKey(opt)"
+            :class="['option-card', { selected: isSelectedMulti(opt), disabled: isReadonly }]"
+            @click="!isReadonly && toggleMulti(opt)"
           >
-            <span :class="['checkbox-box', { checked: multiSelected.includes(opt.value) }]" />
+            <span :class="['checkbox-box', { checked: isSelectedMulti(opt) }]" />
             <div class="option-content">
               <div class="option-label">
                 {{ opt.label }}
@@ -108,7 +108,8 @@
 import { ref, computed, watch } from 'vue'
 
 export interface PlanningOption {
-  value: string
+  value?: string
+  id?: string
   label: string
   description?: string
   recommended?: boolean
@@ -116,6 +117,7 @@ export interface PlanningOption {
 
 export interface PlanningQuestion {
   id: string
+  prompt?: string
   question: string
   inputType: 'single_select' | 'multi_select'
   required: boolean
@@ -157,6 +159,26 @@ watch(
 
 const currentQuestion = computed(() => props.questions[currentStep.value])
 
+function optionKey(opt: PlanningOption): string {
+  return opt.id || opt.value || opt.label
+}
+
+function getOptionId(opt: PlanningOption): string {
+  return opt.id || opt.value || opt.label
+}
+
+function isSelected(opt: PlanningOption): boolean {
+  return currentAnswer.value === getOptionId(opt)
+}
+
+function isSelectedMulti(opt: PlanningOption): boolean {
+  return multiSelected.value.includes(getOptionId(opt))
+}
+
+function selectOption(opt: PlanningOption): void {
+  currentAnswer.value = getOptionId(opt)
+}
+
 const currentAnswer = computed({
   get: () => {
     if (currentQuestion.value.inputType === 'multi_select') return multiSelected.value.join(',')
@@ -177,7 +199,8 @@ const hasCurrentAnswer = computed(() => {
   return !!singleAnswers.value[currentQuestion.value.id]
 })
 
-function toggleMulti(value: string) {
+function toggleMulti(opt: PlanningOption) {
+  const value = getOptionId(opt)
   const idx = multiSelected.value.indexOf(value)
   if (idx >= 0) {
     multiSelected.value.splice(idx, 1)

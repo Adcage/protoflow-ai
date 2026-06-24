@@ -343,15 +343,19 @@ const doChatWithMessage = async (rawMessage: string) => {
 }
 
 function hasActivePlanning(): boolean {
-  const PLANNING_TAG_RE = /<planning\s+type="(\w+)"\s*>([\s\S]*?)<\/planning>/
-  return messages.value.some((msg) => {
+  return messages.value.some((msg, idx) => {
     if (msg.role !== 'ai') return false
+    // 优先使用结构化 planning 字段
+    if (msg.planning && msg.planning.questions && msg.planning.questions.length > 0) {
+      const nextUserMsg = messages.value.slice(idx + 1).find((m) => m.role === 'user')
+      return !nextUserMsg
+    }
+    // 兼容旧 <planning> 标签
+    const PLANNING_TAG_RE = /<planning\s+type="(\w+)"\s*>([\s\S]*?)<\/planning>/
     const match = msg.content.match(PLANNING_TAG_RE)
     if (!match) return false
-    // 检查是否有未回答的 clarification
     if (match[1] === 'clarification') {
-      const msgIndex = messages.value.indexOf(msg)
-      const nextUserMsg = messages.value.slice(msgIndex + 1).find((m) => m.role === 'user')
+      const nextUserMsg = messages.value.slice(idx + 1).find((m) => m.role === 'user')
       return !nextUserMsg
     }
     return false
@@ -364,19 +368,26 @@ function hasActivePlanning(): boolean {
 
 async function handlePlanningSubmit(answers: Record<string, string>) {
   const PLANNING_TAG_RE = /<planning\s+type="(\w+)"\s*>([\s\S]*?)<\/planning>/
-  const pdList: { questions: { id: string; question: string }[] }[] = []
-  for (let i = 0; i < messages.value.length; i++) {
+  // 优先从结构化 planning 字段查找最新 clarification
+  let latest: { questionSetId?: string; questions: { id: string; question: string }[] } | null = null
+  for (let i = messages.value.length - 1; i >= 0; i--) {
     const msg = messages.value[i]
     if (msg.role !== 'ai') continue
+    if (msg.planning && msg.planning.questions.length > 0) {
+      latest = { questionSetId: msg.planning.questionSetId, questions: msg.planning.questions }
+      break
+    }
     const match = msg.content.match(PLANNING_TAG_RE)
     if (match && match[1] === 'clarification') {
       try {
         const data = JSON.parse(match[2])
-        pdList.push(data)
-      } catch { /* skip */ }
+        latest = { questions: data.questions || [] }
+        break
+      } catch {
+        // skip
+      }
     }
   }
-  const latest = pdList[pdList.length - 1]
   if (!latest) return
   const answersList: string[] = []
   for (const q of latest.questions) {
@@ -460,14 +471,23 @@ const doEnhanceInput = async (promptText: string) => {
  * 更新预览
  */
 const updatePreview = async (refresh = false) => {
-  const codeGenType = app.value?.codeGenType || 'single_file'
-  const deployUrlPrefix = import.meta.env.VITE_APP_DEPLOY_URL_PREFIX
   previewWarning.value = ''
   selectedElement.value = null
 
-  const nextUrl = buildPreviewUrl(codeGenType, deployUrlPrefix, refresh)
+  const previewUrl = app.value?.previewUrl
+  if (!previewUrl) {
+    if (iframeUrl.value) {
+      previewStatus.value = 'ready'
+      previewWarning.value = '预览地址暂不可用，显示的是上一次的预览结果'
+    } else {
+      iframeUrl.value = ''
+      previewStatus.value = 'idle'
+    }
+    return
+  }
 
-  // 非刷新模式下，如果 URL 基础路径相同（不含时间戳），跳过重复检查
+  const nextUrl = refresh ? `${previewUrl}${previewUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : previewUrl
+
   if (!refresh && iframeUrl.value) {
     const currentBase = iframeUrl.value.split('?')[0]
     const nextBase = nextUrl.split('?')[0]
@@ -476,8 +496,6 @@ const updatePreview = async (refresh = false) => {
     }
   }
 
-  // 无论当前会话是否有消息，都尝试检查服务器上的预览资源
-  // （之前的会话可能已经生成过，资源仍然存在）
   previewStatus.value = 'checking'
   const resourceAvailable = await checkPreviewResource(nextUrl)
   if (resourceAvailable) {
@@ -485,30 +503,11 @@ const updatePreview = async (refresh = false) => {
     iframeUrl.value = nextUrl
     return
   }
-  if (codeGenType === 'multi-file') {
-    const plainUrl = `${deployUrlPrefix}/multi-file/${appId}/index.html${refresh ? `?t=${Date.now()}` : ''}`
-    const plainAvailable = await checkPreviewResource(plainUrl)
-    if (plainAvailable) {
-      previewStatus.value = 'ready'
-      iframeUrl.value = plainUrl
-      return
-    }
-  }
-  const fallbackUrl = `${deployUrlPrefix}/${codeGenType === 'vue_project' ? 'vue_project' : codeGenType}/${appId}/index.html${refresh ? `?t=${Date.now()}` : ''}`
-  const fallbackAvailable = await checkPreviewResource(fallbackUrl)
-  if (fallbackAvailable) {
-    previewStatus.value = 'ready'
-    iframeUrl.value = fallbackUrl
-    return
-  }
 
-  // 资源检查全部失败
   if (iframeUrl.value) {
-    // 已有预览 → 保留旧预览，只更新状态提示
     previewStatus.value = 'ready'
     previewWarning.value = '预览资源检查失败，显示的是上一次的预览结果'
   } else {
-    // 从未有过预览 → idle
     iframeUrl.value = ''
     previewStatus.value = 'idle'
   }
@@ -529,16 +528,6 @@ const { generating, startSSE, stopSSE, streamWarning } = useSSEChat({
   },
 })
 
-const buildPreviewUrl = (codeGenType: string, deployUrlPrefix: string, refresh = false) => {
-  const cache = refresh ? `?t=${Date.now()}` : ''
-  if (codeGenType === 'vue_project') {
-    return `${deployUrlPrefix}/vue_project/${appId}/dist/index.html${cache}`
-  }
-  if (codeGenType === 'multi-file') {
-    return `${deployUrlPrefix}/multi-file/${appId}/dist/index.html${cache}`
-  }
-  return `${deployUrlPrefix}/${codeGenType}/${appId}/index.html${cache}`
-}
 
 const hasPreviewCandidate = () => {
   const latestAiMessage = [...messages.value].reverse().find((item) => item.role === 'ai')

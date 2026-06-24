@@ -9,11 +9,13 @@ from app.artifacts.writer import ArtifactWriter
 
 def _make_manifest(**overrides) -> ArtifactManifest:
     defaults = dict(
-        version=1,
+        version=2,
         kind="vue_project",
         title="Test App",
         entry="src/App.vue",
-        code_gen_type="vue_project",
+        generation_mode="application",
+        artifact_format="vue_project",
+        code_gen_type="",
         supporting_files=["src/App.vue", "package.json", "src/main.ts"],
         source_skill_id="dashboard",
         source_seed_id="vue-basic",
@@ -37,10 +39,12 @@ class TestArtifactWriter:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == 1
+        assert data["version"] == 2
         assert data["kind"] == "vue_project"
         assert data["entry"] == "src/App.vue"
-        assert data["codeGenType"] == "vue_project"
+        assert "codeGenType" not in data
+        assert data["generationMode"] == "application"
+        assert data["artifactFormat"] == "vue_project"
         assert data["supportingFiles"] == ["src/App.vue", "package.json", "src/main.ts"]
         assert data["sourceSkillId"] == "dashboard"
         assert data["sourceSeedId"] == "vue-basic"
@@ -99,7 +103,8 @@ class TestArtifactWriter:
         assert loaded.version == manifest.version
         assert loaded.kind == manifest.kind
         assert loaded.entry == manifest.entry
-        assert loaded.code_gen_type == manifest.code_gen_type
+        assert loaded.generation_mode == manifest.generation_mode
+        assert loaded.artifact_format == manifest.artifact_format
         assert loaded.source_skill_id == manifest.source_skill_id
         assert loaded.craft_ids == manifest.craft_ids
         assert len(loaded.checks) == 1
@@ -125,11 +130,12 @@ class TestArtifactWriter:
 
     def test_serializes_capability_selection_fields(self, tmp_path: Path):
         manifest = ArtifactManifest(
-            version=1,
+            version=2,
             kind="vue_project",
             title="Dashboard",
             entry="src/App.vue",
-            code_gen_type="vue_project",
+            generation_mode="application",
+            artifact_format="vue_project",
             source_skill_id="dashboard",
             source_skill_ids=["frontend-design", "dashboard"],
             source_template_id="dashboard",
@@ -148,11 +154,12 @@ class TestArtifactWriter:
 
     def test_reads_capability_selection_fields(self, tmp_path: Path):
         manifest = ArtifactManifest(
-            version=1,
+            version=2,
             kind="vue_project",
             title="Dashboard",
             entry="src/App.vue",
-            code_gen_type="vue_project",
+            generation_mode="application",
+            artifact_format="vue_project",
             source_skill_ids=["frontend-design", "dashboard"],
             source_template_ids=["dashboard"],
             selection_source="selector",

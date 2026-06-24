@@ -5,6 +5,7 @@ declare namespace API {
     cover?: string
     initPrompt?: string
     codeGenType?: string
+    generationMode?: string
     styleTemplate?: string
     deployKey?: string
     deployedTime?: string
@@ -20,6 +21,7 @@ declare namespace API {
   type AppAddRequest = {
     initPrompt?: string
     codeGenType?: string
+    generationMode?: string
     styleTemplate?: string
     isTestApp?: boolean
   }
@@ -71,6 +73,9 @@ declare namespace API {
     cover?: string
     initPrompt?: string
     codeGenType?: string
+    generationMode?: string
+    artifactFormat?: string
+    previewUrl?: string
     styleTemplate?: string
     deployKey?: string
     deployedTime?: string

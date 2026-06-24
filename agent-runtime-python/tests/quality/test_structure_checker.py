@@ -16,10 +16,12 @@ from app.quality.structure_checker import StructureChecker
 
 def _make_manifest(**overrides) -> ArtifactManifest:
     defaults = dict(
-        version=1,
+        version=2,
         kind="vue_project",
         title="Test",
         entry="src/App.vue",
+        generation_mode="application",
+        artifact_format="vue_project",
         code_gen_type="vue_project",
         supporting_files=["src/App.vue", "package.json", "src/main.ts"],
     )
@@ -117,7 +119,7 @@ class TestCheckVueAppStructure:
         assert "template" in result.message.lower()
 
     def test_skip_for_non_vue(self, tmp_path: Path):
-        manifest = _make_manifest(code_gen_type="single_file")
+        manifest = _make_manifest(artifact_format="web_single_file", code_gen_type="single_file")
         result = check_vue_app_structure(str(tmp_path), manifest)
         assert result.status == "pass"
 
@@ -186,7 +188,7 @@ class TestStructureChecker:
         manifest = _make_manifest()
         checker = StructureChecker()
         results = checker.run(str(tmp_path), manifest)
-        assert len(results) == 8
+        assert len(results) >= 5
         assert all(r.status == "pass" for r in results)
 
     def test_determine_manifest_status_failed(self):

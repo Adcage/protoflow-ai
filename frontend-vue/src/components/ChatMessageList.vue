@@ -9,15 +9,15 @@
       <div class="message-body">
         <template v-if="msg.role === 'ai' && getPlanningData(index)">
           <PlanningForm
-            v-if="getPlanningData(index)!.planningType === 'clarification'"
-            :questions="getPlanningData(index)!.questions!"
+            v-if="getPlanningData(index)!.planningType === 'clarification' && (getPlanningData(index) as Extract<PlanningData, { planningType: 'clarification' }>).questions"
+            :questions="(getPlanningData(index) as Extract<PlanningData, { planningType: 'clarification' }>).questions"
             :readonly-answers="getPlanningAnswers(index)"
             @submit="(answers: Record<string, string>) => $emit('planningSubmit', answers)"
             @skip="$emit('planningSkip', index)"
           />
           <PlanConfirmationCard
-            v-else-if="getPlanningData(index)!.planningType === 'plan_confirmation'"
-            :outline="getPlanningData(index)!.outline!"
+            v-else-if="getPlanningData(index)!.planningType === 'plan_confirmation' && (getPlanningData(index) as Extract<PlanningData, { planningType: 'plan_confirmation' }>).outline"
+            :outline="(getPlanningData(index) as Extract<PlanningData, { planningType: 'plan_confirmation' }>).outline"
             @confirm="$emit('planConfirm', index)"
             @cancel="$emit('planningSkip', index)"
           />
@@ -98,6 +98,7 @@ export interface ChatMessage {
   content: string
   status?: string
   toolEvents?: ToolEvent[]
+  planning?: PlanningQuestionSet
 }
 
 export interface ElementInfo {
@@ -109,7 +110,8 @@ export interface ElementInfo {
 }
 
 type PlanningOption = {
-  value: string
+  id?: string
+  value?: string
   label: string
   description?: string
   recommended?: boolean
@@ -117,17 +119,34 @@ type PlanningOption = {
 
 type PlanningQuestion = {
   id: string
+  prompt?: string
   question: string
-  inputType: string
+  inputType: 'single_select' | 'multi_select'
   required: boolean
   options?: PlanningOption[]
   reason?: string
   placeholder?: string
 }
 
+type PlanningQuestionSet = {
+  questionSetId: string
+  stage?: string
+  protocolVersion?: number
+  questions: PlanningQuestion[]
+}
+
 type PlanningData =
-  | { planningType: 'clarification'; questions: PlanningQuestion[] }
-  | { planningType: 'plan_confirmation'; outline: PlanOutline }
+  | {
+      planningType: 'clarification'
+      questionSetId?: string
+      questions: PlanningQuestion[]
+      // 兼容旧字段
+      question?: string
+      inputType?: string
+      options?: PlanningOption[]
+      required?: boolean
+    }
+  | { planningType: 'plan_confirmation'; outline: PlanOutline; title?: string }
 
 type PlanOutline = {
   title: string
@@ -168,6 +187,25 @@ const listRef = ref<HTMLElement>()
 function getPlanningData(index: number): PlanningData | null {
   const msg = props.messages[index]
   if (!msg || msg.role !== 'ai') return null
+
+  // 优先使用结构化 planning 字段（Phase 3）
+  if (msg.planning && msg.planning.questions && msg.planning.questions.length > 0) {
+    return {
+      planningType: 'clarification',
+      questionSetId: msg.planning.questionSetId,
+      questions: msg.planning.questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        inputType: q.inputType,
+        required: q.required,
+        options: q.options || [],
+        reason: q.reason,
+        placeholder: q.placeholder,
+      })),
+    }
+  }
+
+  // 回退到旧的 <planning> 标签解析（历史消息兼容）
   const match = msg.content.match(PLANNING_TAG_RE)
   if (!match) return null
   try {
@@ -185,6 +223,12 @@ function getPlanningAnswers(index: number): Record<string, string> | null {
   if (!nextUserMsg) return null
   const answers: Record<string, string> = {}
   for (const q of data.questions) {
+    // 优先按 question.id 精确匹配；保留旧 question 文本匹配作为兜底
+    const direct = nextUserMsg.content.match(new RegExp(`\\[\\s*${q.id}\\s*[：:]\\s*([^\\n]+)`, 'i'))
+    if (direct) {
+      answers[q.id] = direct[1].trim()
+      continue
+    }
     const escapedQ = q.question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const answerRe = new RegExp(`${escapedQ}\\s*[：:]\\s*答[：:]\\s*(.+?)(?:\\n|$)`, 'i')
     const qaMatch = nextUserMsg.content.match(answerRe)

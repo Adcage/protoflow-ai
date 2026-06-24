@@ -230,7 +230,7 @@ def test_e2e():
         print(f"  5.6 Verify gRPC path: Checking backend logs...")
         import subprocess
         result = subprocess.run(
-            ["powershell", "-Command", f"Get-Content 'E:\\Programme\\Project\\ac-ai-code-free\\logs\\backend.log' -Tail 100 | Select-String -Pattern 'grpc|GrpcPythonAgentRuntime|StreamGenerate' | Select-Object -First 5"],
+            ["powershell", "-Command", f"Get-Content 'E:\\Programme\\Project\\protoflow-ai\\logs\\backend.log' -Tail 100 | Select-String -Pattern 'grpc|GrpcPythonAgentRuntime|StreamGenerate' | Select-Object -First 5"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
         )
         stdout = (result.stdout or "").strip()

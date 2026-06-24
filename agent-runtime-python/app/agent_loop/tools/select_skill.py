@@ -1,3 +1,10 @@
+"""Phase 3 Skill 选择工具。
+
+旧版 ``select_skill`` 工具仅设置 ``selected_skill_id`` 字符串；Phase 3 后该工具改为
+薄兼容入口，委托 ``ChooseSkillTool`` 通过状态机写入结构化 CapabilityBundleRef，
+包括 digest 和 loaded_resources。Seed/Craft 永远不可启用。
+"""
+
 import logging
 from typing import Type
 
@@ -12,6 +19,10 @@ class SelectSkillInput(BaseModel):
         description="要选择的 Skill ID，如 dashboard、landing-page、web-prototype、frontend-design"
     )
     reason: str = Field(default="", description="选择原因")
+    loaded_resources: list[str] = Field(
+        default_factory=list,
+        description="本次会话内已加载的资源相对路径列表",
+    )
 
 
 class SelectSkillTool(BaseTool):
@@ -19,49 +30,39 @@ class SelectSkillTool(BaseTool):
     name: str = "select_skill"
     description: str = (
         "从可用 Skill 列表中选择一个最适合当前任务的 Skill。"
-        "选择 Skill 后你可以用 read_asset 读取 Skill 的详细规则和参考资源，"
-        "用 run_command 执行 Skill 目录下的脚本。"
+        "Phase 3 流程：选择会同时写入 CapabilityBundleRef（含 content_digest），"
+        "并把当前 PlanStage 推进到下一阶段。"
     )
     args_schema: Type[BaseModel] = SelectSkillInput
 
     _state: object | None = None
+    _delegate: object | None = None
 
     def set_state(self, state: object) -> None:
         self._state = state
 
-    def _run(self, skill_id: str, reason: str = "") -> str:
+    def set_delegate(self, delegate: object) -> None:
+        self._delegate = delegate
+
+    def _run(self, skill_id: str, reason: str = "", loaded_resources: list[str] | None = None) -> str:
         raise NotImplementedError("Use async version")
 
-    async def _arun(self, skill_id: str, reason: str = "") -> str:
+    async def _arun(
+        self,
+        skill_id: str,
+        reason: str = "",
+        loaded_resources: list[str] | None = None,
+    ) -> str:
         if self._state is None:
             return "错误：未绑定 AgentLoopState"
 
-        state = self._state
-        index = getattr(state, "_asset_index", None)
-        if index is None:
-            return "错误：资产索引未加载，无法选择 Skill"
+        if self._delegate is None:
+            return "错误：未配置 ChooseSkillTool delegate，请先通过 init 节点注入"
 
-        try:
-            skill_def = index.skill_registry.get(skill_id)
-        except KeyError:
-            available = [s.id for s in index.skill_registry.all()]
-            return f"未找到 Skill '{skill_id}'。可用 Skill: {', '.join(available)}"
-
-        from app.capabilities.common.loader_result import SelectedCapabilities
-        from app.capabilities.common.capability_selection import CapabilitySelection
-
-        selection = CapabilitySelection(
-            skill_ids=(skill_id,),
-            selection_source="agent_loop",
+        # delegate 已是绑定到 ChooseSkillTool 实例的 _arun
+        # 显式按 kwargs 转发以避免 self/state 重复传入
+        return await self._delegate(
+            skill_id=skill_id,
             reason=reason,
+            loaded_resources=loaded_resources or [],
         )
-        state.selected_capabilities = SelectedCapabilities(
-            selection=selection,
-            skills=[skill_def],
-        )
-
-        state.selected_skill_id = skill_id
-
-        logger.info("select_skill | skill=%s reason=%s", skill_id, reason)
-        skill_dir = str(skill_def.source_path.parent)
-        return f"已选择 Skill: {skill_def.name} — {skill_def.description}\n\nSkill 目录路径: {skill_dir}\n你可以用 read_asset 读取资源，或用 run_command 执行该目录下的脚本。"

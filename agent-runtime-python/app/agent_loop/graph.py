@@ -13,18 +13,72 @@ def _get_state_attr(state, key, default=None):
     return getattr(state, key, default)
 
 
-def _set_state_attr(state, key, value):
-    if isinstance(state, dict):
-        state[key] = value
-    else:
-        setattr(state, key, value)
+def _ensure_execution_contract_after_plan(state: AgentLoopState) -> None:
+    envelope = getattr(state, "_state_envelope", None)
+    if envelope is None:
+        return
+    execution = envelope.workflow.execution
+    if getattr(execution, "execution_contract", None) is not None:
+        return
+    plan_state = envelope.workflow.plan
+    impl_plan = getattr(plan_state, "implementation_plan", None)
+    if impl_plan is None:
+        return
+    generation_mode = getattr(envelope.workflow, "generation_mode", None) or "application"
+    artifact_format = _infer_artifact_format_from_code_gen_type(state)
+    try:
+        from app.agent_loop.execution_contract import from_implementation_plan
+        contract = from_implementation_plan(impl_plan, generation_mode, artifact_format)
+        execution.execution_contract = contract.model_dump()
+    except Exception as e:
+        logger.warning("_ensure_execution_contract_after_plan | failed: %s", e)
+
+
+def _infer_artifact_format_from_code_gen_type(state: AgentLoopState) -> str:
+    code_gen_type_str = ""
+    artifact_type_state = getattr(state, "artifact_type_state", None)
+    if artifact_type_state is not None:
+        code_gen_type_str = getattr(artifact_type_state, "effective", "")
+    if not code_gen_type_str:
+        code_gen_type_str = getattr(state, "recommended_code_gen_type", "")
+    if not code_gen_type_str:
+        code_gen_type_str = "vue_project"
+    mapping = {
+        "single_file": "web_single_file",
+        "multi-file": "web_multi_file",
+        "vue_project": "vue_project",
+    }
+    return mapping.get(code_gen_type_str, "vue_project")
+
+
+def _route_finished(state) -> bool:
+    if _get_state_attr(state, "status") == "waiting_for_user":
+        return True
+    if _get_state_attr(state, "status") in ("completed", "failed"):
+        return True
+    if _get_state_attr(state, "iteration") >= _get_state_attr(state, "max_iterations"):
+        if hasattr(state, 'status') and state.status == "running":
+            state.status = "failed"
+            if not state.final_summary:
+                state.final_summary = (
+                    f"全局迭代上限 {state.max_iterations} 已到 "
+                    f"(mode={state.mode}, iteration={state.iteration})"
+                )
+        return True
+    if _get_state_attr(state, "mode_switches") >= _get_state_attr(state, "max_mode_switches"):
+        if hasattr(state, 'status') and state.status == "running":
+            state.status = "failed"
+            if not state.final_summary:
+                state.final_summary = (
+                    f"模式切换上限 {state.max_mode_switches} 已到 "
+                    f"(mode={state.mode}, mode_switches={state.mode_switches})"
+                )
+        return True
+    return False
 
 
 def route_after_route_step(state: AgentLoopState) -> str:
-    """route_step 完成后，根据 route_decision 或 status 路由。"""
-    if _get_state_attr(state, "status") == "waiting_for_user":
-        return "finish"
-    if _get_state_attr(state, "status") in ("completed", "failed"):
+    if _route_finished(state):
         return "finish"
     decision = _get_state_attr(state, "route_decision")
     if decision and isinstance(decision, dict):
@@ -37,34 +91,53 @@ def route_after_route_step(state: AgentLoopState) -> str:
             return "implement_step"
         if mode == "validate":
             return "validate_step"
-    # 默认路由到 plan
     return "plan_step"
 
 
-def route_after_step(state: AgentLoopState) -> str:
-    """plan_step 完成后的路由逻辑（沿用原有逻辑）。"""
-    if _get_state_attr(state, "status") == "waiting_for_user":
+def route_after_plan_step(state: AgentLoopState) -> str:
+    """plan_step 完成后路由。
+
+    状态变更已在 PlanStepNode.apply_exit_transition 中完成。
+    此函数仅读取状态决定下一节点。
+    """
+    if _route_finished(state):
         return "finish"
-    if _get_state_attr(state, "status") in ("completed", "failed"):
-        return "finish"
-    if _get_state_attr(state, "iteration") >= _get_state_attr(state, "max_iterations"):
-        return "finish"
-    if _get_state_attr(state, "mode_switches") >= _get_state_attr(state, "max_mode_switches"):
-        return "finish"
-    if _get_state_attr(state, "mode") == "plan" and _get_state_attr(state, "plan_iterations") >= _get_state_attr(state, "max_plan_iterations"):
-        logger.warning(
-            "route | plan_iterations=%d exceeded max_plan_iterations=%d, force switching to implement",
-            _get_state_attr(state, "plan_iterations"),
-            _get_state_attr(state, "max_plan_iterations"),
-        )
-        _set_state_attr(state, "mode", "implement")
+    if _get_state_attr(state, "plan_just_finished"):
         return "implement_step"
-    mode = _get_state_attr(state, "mode")
-    if mode == "plan":
-        return "plan_step"
-    if mode == "implement":
-        return "implement_step"
-    return "finish"
+    return "plan_step"
+
+
+def route_after_implement_step(state: AgentLoopState) -> str:
+    """implement_step 完成后路由。
+
+    状态变更已在 ImplementDispatcherNode.apply_exit_transition 中完成。
+    此函数仅读取状态决定下一节点。
+    """
+    if _route_finished(state):
+        return "finish"
+    if _get_state_attr(state, "implement_just_finished"):
+        if getattr(state, "implement_replan_requested", False):
+            return "route_step"
+        return "validate_step"
+    return "implement_step"
+
+
+def route_after_validate_step(state: AgentLoopState) -> str:
+    """validate_step 完成后路由。
+
+    状态变更已在 ValidateStepNode.apply_exit_transition 中完成。
+    此函数仅读取状态决定下一节点。
+    """
+    if _route_finished(state):
+        return "finish"
+    if _get_state_attr(state, "validate_just_finished"):
+        validation_status = _get_state_attr(state, "validation_status", "pending")
+        if validation_status == "passed":
+            return "finish"
+        return "route_step"
+    if _get_state_attr(state, "validate_iterations") >= _get_state_attr(state, "max_validate_iterations"):
+        return "route_step"
+    return "validate_step"
 
 
 def build_agent_loop_graph(
@@ -77,12 +150,12 @@ def build_agent_loop_graph(
 ) -> StateGraph:
     """构建 Agent Loop 图结构。
 
-    图结构：
-        init → route_step → [plan_step / implement_step / validate_step / finish]
+    固定流转图：
+        init → route_step → [plan_step / implement_step / finish]
 
-        大循环内：
-          plan_step ↔ implement_step → route_step → [validate_step / finish]
-          validate_step → route_step → [implement_step(修复) / finish]
+        plan_step → plan_step / implement_step / finish
+        implement_step → implement_step / validate_step / route_step / finish
+        validate_step → validate_step / route_step / finish
     """
     graph = StateGraph(AgentLoopState)
 
@@ -96,7 +169,6 @@ def build_agent_loop_graph(
     graph.set_entry_point("init")
     graph.add_edge("init", "route_step")
 
-    # route_step 的条件边：根据 route_decision 路由
     graph.add_conditional_edges(
         "route_step",
         route_after_route_step,
@@ -108,19 +180,27 @@ def build_agent_loop_graph(
         },
     )
 
-    # plan_step 条件边
     graph.add_conditional_edges(
         "plan_step",
-        route_after_step,
+        route_after_plan_step,
         {"plan_step": "plan_step", "implement_step": "implement_step", "finish": "finish"},
     )
 
-    # implement_step 完成后标记并路由到 route_step
-    # 注意：这里需要在 implement_step 完成后设置 implement_just_finished = True
-    # 实际由 ImplementStepNode 在 _execute_single_step 返回后处理
-    graph.add_edge("implement_step", "route_step")
+    graph.add_conditional_edges(
+        "implement_step",
+        route_after_implement_step,
+        {
+            "implement_step": "implement_step",
+            "validate_step": "validate_step",
+            "route_step": "route_step",
+            "finish": "finish",
+        },
+    )
 
-    # validate_step 完成后路由到 route_step
-    graph.add_edge("validate_step", "route_step")
+    graph.add_conditional_edges(
+        "validate_step",
+        route_after_validate_step,
+        {"validate_step": "validate_step", "route_step": "route_step", "finish": "finish"},
+    )
 
     return graph.compile()

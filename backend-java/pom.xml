@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.adcage</groupId>
-    <artifactId>ac-ai-code-free</artifactId>
+    <artifactId>protoflow-ai</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>ac-ai-code-free</name>
-    <description>ac-ai-code-free</description>
+    <name>protoflow-ai</name>
+    <description>protoflow-ai</description>
     <url/>
     <licenses>
         <license/>

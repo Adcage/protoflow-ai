@@ -20,6 +20,7 @@ message ReadFileRequest {
   int64 app_id = 1;
   CodeGenType code_gen_type = 2;
   string relative_path = 3;
+  GenerationMode generation_mode = 4;
 }
 
 message ReadFileResponse {
@@ -31,6 +32,7 @@ message WriteFileRequest {
   CodeGenType code_gen_type = 2;
   string relative_path = 3;
   string content = 4;
+  GenerationMode generation_mode = 5;
 }
 
 message WriteFileResponse {
@@ -43,6 +45,7 @@ message ModifyFileRequest {
   string relative_path = 3;
   string old_content = 4;
   string new_content = 5;
+  GenerationMode generation_mode = 6;
 }
 
 message ModifyFileResponse {
@@ -53,6 +56,7 @@ message DeleteFileRequest {
   int64 app_id = 1;
   CodeGenType code_gen_type = 2;
   string relative_path = 3;
+  GenerationMode generation_mode = 4;
 }
 
 message DeleteFileResponse {
@@ -63,6 +67,7 @@ message ReadDirRequest {
   int64 app_id = 1;
   CodeGenType code_gen_type = 2;
   string relative_path = 3;
+  GenerationMode generation_mode = 4;
 }
 
 message ReadDirResponse {

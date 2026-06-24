@@ -1,7 +1,7 @@
 !temp
-!docs/superpowers/
 
 !logs/
 !*.log
 
-!docs/ai-runtime/
+!storage/
+!docs/

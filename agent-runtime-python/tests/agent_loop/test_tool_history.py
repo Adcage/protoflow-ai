@@ -1,4 +1,6 @@
-from app.agent_loop.tool_history import compact_tool_records
+from langchain_core.messages import SystemMessage
+
+from app.agent_loop.tool_history import compact_tool_records, format_tool_observation_history
 from app.runtime.state import ToolCallRecord
 
 
@@ -23,7 +25,7 @@ def test_write_file_content_is_not_replayed():
     assert compacted[0].arguments["relative_path"] == "src/App.vue"
 
 
-def test_read_file_result_keeps_head_and_tail():
+def test_read_file_result_is_preserved_in_full():
     result = "HEAD" + "x" * 20_000 + "TAIL"
     records = [
         ToolCallRecord(id="r1", name="read_file", arguments={}, result=result)
@@ -31,17 +33,15 @@ def test_read_file_result_keeps_head_and_tail():
 
     compacted = compact_tool_records(
         records,
-        max_total_chars=10_000,
-        max_result_chars=1_000,
+        max_total_chars=200_000,
+        max_result_chars=200_000,
     )
 
-    assert compacted[0].result.startswith("HEAD")
-    assert compacted[0].result.endswith("TAIL")
-    assert "已省略" in compacted[0].result
-    assert len(compacted[0].result) <= 1_000
+    assert compacted[0].result == result
+    assert len(compacted[0].result) == len(result)
 
 
-def test_total_budget_prefers_latest_tool_records():
+def test_all_records_are_preserved():
     records = [
         ToolCallRecord(
             id=str(index),
@@ -58,5 +58,39 @@ def test_total_budget_prefers_latest_tool_records():
         max_result_chars=2_000,
     )
 
+    assert len(compacted) == 5
+    assert compacted[0].id == "0"
     assert compacted[-1].id == "4"
-    assert sum(len(record.result or "") for record in compacted) <= 3_500
+
+
+def test_format_tool_observation_history_is_readonly_system_message():
+    records = [
+        ToolCallRecord(
+            id="w1",
+            name="write_file",
+            arguments={"relative_path": "src/App.vue", "content": "<template>secret</template>"},
+            result="文件写入成功",
+        ),
+        ToolCallRecord(
+            id="r1",
+            name="read_file",
+            arguments={"relative_path": "src/main.py"},
+            result="print('hello')",
+        ),
+    ]
+
+    message = format_tool_observation_history(
+        records,
+        max_total_chars=10_000,
+        max_result_chars=2_000,
+    )
+
+    assert isinstance(message, SystemMessage)
+    assert "历史工具操作记录" in message.content
+    assert "不是当前待执行调用" in message.content
+    assert "--- file_write" in message.content
+    assert "[src/App.vue]" in message.content
+    assert "(ok)" in message.content
+    assert "内容已压缩" in message.content or "<template>" in message.content
+    assert "--- file_read" in message.content
+    assert "[src/main.py]" in message.content

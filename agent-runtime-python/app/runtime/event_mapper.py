@@ -15,28 +15,38 @@ _VISIBLE_TOOLS = frozenset({
     "read_file",
     "read_dir",
     "run_checks",
-    "ask_user",
 })
 
 _STATUS_TOOLS: dict[str, str] = {
     "select_skill": "正在选择设计方案...",
-    "switch_mode": "正在切换工作模式...",
     "write_plan": "正在制定实现计划...",
     "read_asset": "正在查询设计资源...",
     "run_command": "正在执行命令...",
     "decide_route": "正在路由决策...",
     "decide_validation": "正在输出校验结论...",
+    "request_replan": "正在请求重新规划...",
+    "submit_requirement_brief": "正在提交需求摘要...",
+    "record_project_inspection": "正在记录项目检查...",
+    "choose_skill": "正在选择设计方案...",
+    "propose_design": "正在提出设计建议...",
+    "confirm_design": "正在确认设计方案...",
+    "write_implementation_plan": "正在编写实施计划...",
+    "plan_stage_guard": "正在处理阶段状态...",
+    "confirm_generation_mode": "正在确认生成模式...",
+    "complete_implementation": "正在提交实现完成...",
+    "submit_validation_report": "正在提交校验报告...",
 }
 
-_HIDDEN_TOOLS = frozenset({"finish"})
+_HIDDEN_TOOLS = frozenset({"finish", "ask_user"})
 
 _INTERNAL_TYPES = frozenset({
     RuntimeEventType.NODE_STARTED,
     RuntimeEventType.NODE_COMPLETED,
     RuntimeEventType.CAPABILITY_SELECTED,
     RuntimeEventType.MODEL_SELECTED,
-    RuntimeEventType.CLARIFICATION_REQUIRED,
     RuntimeEventType.MODE_SWITCHED,
+    RuntimeEventType.AGENT_LOOP_ITERATION,
+    RuntimeEventType.AGENT_LOOP_COMPLETED,
 })
 
 
@@ -114,10 +124,21 @@ _EVENT_TYPE_MAP: dict[RuntimeEventType, int] = {
 
 
 class ProtoEventMapper:
+    def __init__(self) -> None:
+        self._emitted_question_set_ids: set[str] = set()
+
+    def reset_question_set_dedupe(self) -> None:
+        self._emitted_question_set_ids.clear()
+
     def map_event(
         self, sequenced_event: SequencedRuntimeEvent
     ) -> code_generation_pb2.CodeGenerationEvent | None:
         event = sequenced_event.event
+
+        # CLARIFICATION_REQUIRED 由 event_mapper 折叠为 ask_user TOOL_REQUEST，
+        # 同一 questionSetId 只下发一次。
+        if event.event_type == RuntimeEventType.CLARIFICATION_REQUIRED:
+            return self._map_clarification_required(sequenced_event)
 
         if event.event_type in _INTERNAL_TYPES:
             return None
@@ -160,6 +181,38 @@ class ProtoEventMapper:
             )
 
         return code_generation_pb2.CodeGenerationEvent(**kwargs)
+
+    def _map_clarification_required(
+        self, sequenced_event: SequencedRuntimeEvent
+    ) -> code_generation_pb2.CodeGenerationEvent | None:
+        data = sequenced_event.event.data or {}
+        question_set_id = data.get("questionSetId", "")
+        questions = data.get("questions") or []
+        if not question_set_id or not questions:
+            return None
+        if question_set_id in self._emitted_question_set_ids:
+            return None
+        self._emitted_question_set_ids.add(question_set_id)
+
+        arguments = json.dumps(
+            {
+                "protocolVersion": data.get("protocolVersion", 1),
+                "questionSetId": question_set_id,
+                "stage": data.get("stage", ""),
+                "questions": questions,
+            },
+            ensure_ascii=False,
+        )
+        return code_generation_pb2.CodeGenerationEvent(
+            agent_run_id=str(sequenced_event.agent_run_id),
+            seq=sequenced_event.seq,
+            event_type=common_pb2.TOOL_REQUEST,
+            tool_request=common_pb2.ToolRequestData(
+                id=question_set_id,
+                name="ask_user",
+                arguments=arguments,
+            ),
+        )
 
     def _map_tool_call(
         self, sequenced_event: SequencedRuntimeEvent
@@ -214,15 +267,9 @@ class ProtoEventMapper:
         if tool_name in _HIDDEN_TOOLS:
             return None
 
-        # ask_user TOOL_RESULT 发 AI_RESPONSE，提问内容展示在对话气泡里
+        # ask_user TOOL_RESULT 不映射为 AI_RESPONSE；只下发一次 TOOL_REQUEST（来自 CLARIFICATION_REQUIRED 折叠）
         if tool_name == "ask_user":
-            question_text = _sanitize_tool_result(tool_name, data.get("result", ""))
-            return code_generation_pb2.CodeGenerationEvent(
-                agent_run_id=str(sequenced_event.agent_run_id),
-                seq=sequenced_event.seq,
-                event_type=common_pb2.AI_RESPONSE,
-                ai_response=common_pb2.AiResponseData(text=question_text),
-            )
+            return None
 
         if tool_name in _STATUS_TOOLS:
             return code_generation_pb2.CodeGenerationEvent(

@@ -33,7 +33,6 @@ class TerminalTools:
         ]
         self._default_timeout = default_timeout
         self._max_timeout = max_timeout
-        self._max_output_bytes = max_output_bytes
 
     async def run_command(
         self,
@@ -184,10 +183,6 @@ class TerminalTools:
             if combined:
                 combined += "\n"
             combined += err_text
-
-        if len(combined.encode("utf-8", errors="replace")) > self._max_output_bytes:
-            total_bytes = len(combined.encode("utf-8", errors="replace"))
-            combined = combined[: self._max_output_bytes] + f"\n[输出截断，完整输出 {total_bytes} 字节]"
 
         exit_code = proc.returncode or 0
         return {"exit_code": exit_code, "output": combined}

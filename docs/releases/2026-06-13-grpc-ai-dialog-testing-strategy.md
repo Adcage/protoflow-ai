@@ -247,14 +247,14 @@ git diff --stat
 Java：
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/backend-java
+cd E:/Programme/Project/protoflow-ai/backend-java
 mvn clean compile
 ```
 
 Python：
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/agent-runtime-python
+cd E:/Programme/Project/protoflow-ai/agent-runtime-python
 python scripts/generate_grpc.py
 python -c "from app.grpc import code_generation_pb2, platform_service_pb2, tool_service_pb2, common_pb2; print('grpc imports ok')"
 ```
@@ -472,7 +472,7 @@ python -c "from app.grpc import code_generation_pb2, platform_service_pb2, tool_
 1. 启动 Java 后端：
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/backend-java
+cd E:/Programme/Project/protoflow-ai/backend-java
 $env:AGENT_RUNTIME="python-agent"
 $env:AGENT_RUNTIME_INTERNAL_SECRET="local-test-secret"
 mvn spring-boot:run
@@ -481,7 +481,7 @@ mvn spring-boot:run
 2. 启动 Python Runtime：
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/agent-runtime-python
+cd E:/Programme/Project/protoflow-ai/agent-runtime-python
 $env:AGENT_INTERNAL_SECRET="local-test-secret"
 $env:JAVA_GRPC_TARGET="localhost:9090"
 $env:GRPC_SERVER_PORT="9091"
@@ -497,7 +497,7 @@ Get-NetTCPConnection -LocalPort 8700,9000,9090,9091
 ### 11.2 执行现有 smoke 脚本
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/agent-runtime-python
+cd E:/Programme/Project/protoflow-ai/agent-runtime-python
 python scripts/test_grpc_all.py
 ```
 
@@ -578,7 +578,7 @@ GET /app/chat/gen/code/stream?appId=<appId>&sessionId=<sessionId>&message=<messa
 ### 12.2 后端自动化测试命令
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/backend-java
+cd E:/Programme/Project/protoflow-ai/backend-java
 mvn test -Dtest=PythonAgentE2ETest,AppChatE2ETest,AgentRunServiceImplTest,ModelConfigServiceImplTest
 ```
 
@@ -648,7 +648,7 @@ WHERE agentRunId = <agentRunId>;
 检查：
 
 ```powershell
-Get-ChildItem -Recurse E:/Programme/Project/ac-ai-code-free/storage/agent-workspaces/<agentRunId>/source
+Get-ChildItem -Recurse E:/Programme/Project/protoflow-ai/storage/agent-workspaces/<agentRunId>/source
 ```
 
 期望：
@@ -663,7 +663,7 @@ Get-ChildItem -Recurse E:/Programme/Project/ac-ai-code-free/storage/agent-worksp
 ### 13.1 启动前端
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/frontend-vue
+cd E:/Programme/Project/protoflow-ai/frontend-vue
 npm run dev
 ```
 
@@ -796,8 +796,8 @@ http://localhost:5173
 每次 E2E 失败先读：
 
 ```powershell
-Get-Content E:/Programme/Project/ac-ai-code-free/logs/backend.log -Tail 200
-Get-Content E:/Programme/Project/ac-ai-code-free/logs/agent-python.log -Tail 200
+Get-Content E:/Programme/Project/protoflow-ai/logs/backend.log -Tail 200
+Get-Content E:/Programme/Project/protoflow-ai/logs/agent-python.log -Tail 200
 ```
 
 ### 15.2 关键搜索词
@@ -846,7 +846,7 @@ Select-String -Path logs/agent-python.log -Pattern "grpc|StreamGenerate|tool_req
 ### 16.1 Java 快速门禁
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/backend-java
+cd E:/Programme/Project/protoflow-ai/backend-java
 mvn test -Dtest=ModelConfigServiceImplTest,AgentRunServiceImplTest
 mvn test -Dtest=AppChatE2ETest,PythonAgentE2ETest
 mvn clean package -DskipTests
@@ -855,7 +855,7 @@ mvn clean package -DskipTests
 ### 16.2 Python 快速门禁
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/agent-runtime-python
+cd E:/Programme/Project/protoflow-ai/agent-runtime-python
 python -m pytest tests/services/test_agent_service.py tests/agent/test_graph.py tests/api/test_code_generation_stream.py
 python -m pytest
 ```
@@ -863,7 +863,7 @@ python -m pytest
 ### 16.3 gRPC 集成门禁
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/agent-runtime-python
+cd E:/Programme/Project/protoflow-ai/agent-runtime-python
 python scripts/test_grpc_all.py
 python scripts/test_grpc_platform.py
 python scripts/test_grpc_data_check.py
@@ -872,7 +872,7 @@ python scripts/test_grpc_data_check.py
 ### 16.4 前端门禁
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/frontend-vue
+cd E:/Programme/Project/protoflow-ai/frontend-vue
 npm run type-check
 npm run build
 ```
@@ -880,7 +880,7 @@ npm run build
 ### 16.5 代码卫生
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free
+cd E:/Programme/Project/protoflow-ai
 git diff --check
 git status --short
 ```
@@ -967,7 +967,7 @@ npm run build
 然后启动 Java/Python 双服务，执行：
 
 ```powershell
-cd E:/Programme/Project/ac-ai-code-free/agent-runtime-python
+cd E:/Programme/Project/protoflow-ai/agent-runtime-python
 python scripts/test_grpc_all.py
 ```
 

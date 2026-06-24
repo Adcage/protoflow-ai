@@ -36,7 +36,7 @@ async def run_test():
         user_id=1,
         prompt="做一个简单的计数器应用，只有一个按钮和数字显示",
         code_gen_type=common_pb2.VUE_PROJECT,
-        workspace_path="E:/Programme/Project/ac-ai-code-free/agent-runtime-python/workspace/test-app",
+        workspace_path="E:/Programme/Project/protoflow-ai/agent-runtime-python/workspace/test-app",
         model_config_id=1,
         config_version=1,
     )

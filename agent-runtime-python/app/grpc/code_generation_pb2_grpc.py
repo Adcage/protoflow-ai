@@ -44,11 +44,6 @@ class CodeGenerationServiceStub:
                 request_serializer=code__generation__pb2.CodeModificationRequest.SerializeToString,
                 response_deserializer=code__generation__pb2.CodeGenerationEvent.FromString,
                 _registered_method=True)
-        self.RouteCodeGenType = channel.unary_unary(
-                '/com.adcage.acaicodefree.CodeGenerationService/RouteCodeGenType',
-                request_serializer=code__generation__pb2.RouteCodeGenTypeRequest.SerializeToString,
-                response_deserializer=code__generation__pb2.RouteCodeGenTypeResponse.FromString,
-                _registered_method=True)
         self.ValidatePrompt = channel.unary_unary(
                 '/com.adcage.acaicodefree.CodeGenerationService/ValidatePrompt',
                 request_serializer=code__generation__pb2.ValidatePromptRequest.SerializeToString,
@@ -71,12 +66,6 @@ class CodeGenerationServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def StreamModify(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def RouteCodeGenType(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -106,11 +95,6 @@ def add_CodeGenerationServiceServicer_to_server(servicer, server):
                     servicer.StreamModify,
                     request_deserializer=code__generation__pb2.CodeModificationRequest.FromString,
                     response_serializer=code__generation__pb2.CodeGenerationEvent.SerializeToString,
-            ),
-            'RouteCodeGenType': grpc.unary_unary_rpc_method_handler(
-                    servicer.RouteCodeGenType,
-                    request_deserializer=code__generation__pb2.RouteCodeGenTypeRequest.FromString,
-                    response_serializer=code__generation__pb2.RouteCodeGenTypeResponse.SerializeToString,
             ),
             'ValidatePrompt': grpc.unary_unary_rpc_method_handler(
                     servicer.ValidatePrompt,
@@ -177,33 +161,6 @@ class CodeGenerationService:
             '/com.adcage.acaicodefree.CodeGenerationService/StreamModify',
             code__generation__pb2.CodeModificationRequest.SerializeToString,
             code__generation__pb2.CodeGenerationEvent.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def RouteCodeGenType(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/com.adcage.acaicodefree.CodeGenerationService/RouteCodeGenType',
-            code__generation__pb2.RouteCodeGenTypeRequest.SerializeToString,
-            code__generation__pb2.RouteCodeGenTypeResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -60,6 +60,12 @@ public class App implements Serializable {
     private String codeGenType;
 
     /**
+     * 生成模式（application/presentation/prototype/diagram）
+     */
+    @Column("generationMode")
+    private String generationMode;
+
+    /**
      * 风格模板
      */
     @Column("styleTemplate")

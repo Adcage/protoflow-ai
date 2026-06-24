@@ -75,6 +75,18 @@ public class AgentRunServiceImpl extends ServiceImpl<AgentRunMapper, AgentRun> i
     }
 
     @Override
+    public void failRunningRun(Long appId, Long sessionId, Long userId, String errorMessage) {
+        AgentRun running = getOne(QueryWrapper.create()
+                .eq("appId", appId)
+                .eq("sessionId", sessionId)
+                .eq("userId", userId)
+                .eq("status", "running"));
+        if (running != null) {
+            failAgentRun(running.getId(), errorMessage);
+        }
+    }
+
+    @Override
     public void updateAgentRunWorkspacePath(Long id, String workspacePath) {
         ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR, "AgentRun ID 不能为空");
         AgentRun agentRun = this.getById(id);

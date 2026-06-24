@@ -5,15 +5,22 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
-    ToolMessage,
 )
 
 from app.agent_loop.state import AgentLoopState
-from app.agent_loop.tool_history import compact_tool_records
+from app.agent_loop.tool_history import format_tool_observation_history
 from app.core.config import settings
 from app.runtime.context import ChatHistoryEntry, ExecutionContext
 
 logger = logging.getLogger("app.agent_loop.message_builder")
+
+
+def _should_include_message(message: dict, current_mode: str) -> bool:
+    """按 source 标签过滤：无 source 或 source=common 的所有模式可见；带 source 的仅在对应模式可见。"""
+    source = message.get("source", "")
+    if not source or source == "common":
+        return True
+    return source == current_mode
 
 
 def _message_from_role(role: str, content: str) -> BaseMessage:
@@ -38,34 +45,12 @@ def _history_before_current(context: ExecutionContext) -> list[ChatHistoryEntry]
 
 
 def _tool_messages(state: AgentLoopState) -> list[BaseMessage]:
-    messages: list[BaseMessage] = []
-    records = compact_tool_records(
+    message = format_tool_observation_history(
         state.executed_tool_calls,
         max_total_chars=settings.agent_tool_history_max_chars,
         max_result_chars=settings.agent_tool_result_max_chars,
     )
-    for record in records:
-        messages.append(
-            AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "id": record.id,
-                        "name": record.name,
-                        "args": record.arguments,
-                        "type": "tool_call",
-                    }
-                ],
-            )
-        )
-        messages.append(
-            ToolMessage(
-                content=record.result or "",
-                tool_call_id=record.id,
-                name=record.name,
-            )
-        )
-    return messages
+    return [message] if message is not None else []
 
 
 def build_llm_messages(
@@ -87,7 +72,7 @@ def build_llm_messages(
     messages.extend(
         _message_from_role(message.get("role", "user"), message.get("content", ""))
         for message in state.conversation_messages
-        if message.get("content")
+        if message.get("content") and _should_include_message(message, state.mode)
     )
 
     if current is not None and context.is_resume:

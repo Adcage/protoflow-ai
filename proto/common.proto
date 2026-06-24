@@ -12,6 +12,11 @@ enum CodeGenType {
   VUE_PROJECT = 3;
 }
 
+enum GenerationMode {
+  GENERATION_MODE_UNSPECIFIED = 0;
+  APPLICATION = 1;
+}
+
 enum EventType {
   EVENT_TYPE_UNSPECIFIED = 0;
   AGENT_START = 1;

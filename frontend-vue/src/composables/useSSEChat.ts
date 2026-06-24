@@ -1,9 +1,36 @@
 import { ref, isRef, unref, type Ref } from 'vue'
 import { message } from 'ant-design-vue'
+import { extractBusinessChunk, splitConcatenatedJsonObjects } from './sseParser'
 
 export interface ToolEvent {
   type: 'request' | 'executed' | 'status'
   text: string
+}
+
+export interface PlanningOption {
+  id?: string
+  value?: string
+  label: string
+  description?: string
+  recommended?: boolean
+}
+
+export interface PlanningQuestion {
+  id: string
+  prompt?: string
+  question?: string
+  inputType: 'single_select' | 'multi_select'
+  required: boolean
+  options?: PlanningOption[]
+  reason?: string
+  placeholder?: string
+}
+
+export interface PlanningQuestionSet {
+  questionSetId: string
+  stage?: string
+  protocolVersion?: number
+  questions: PlanningQuestion[]
 }
 
 export interface ChatMessage {
@@ -11,6 +38,7 @@ export interface ChatMessage {
   content: string
   status?: string
   toolEvents?: ToolEvent[]
+  planning?: PlanningQuestionSet
 }
 
 export interface SSEChatOptions {
@@ -38,6 +66,13 @@ export function useSSEChat(options: SSEChatOptions) {
     return String(id)
   }
 
+  const mapGenerationMode = (codeGenType?: string): string => {
+    if (codeGenType === 'vue_project' || codeGenType === 'multi-file' || codeGenType === 'single_file') {
+      return 'application'
+    }
+    return 'application'
+  }
+
   const startSSE = (userMsg: string, sessionId: string, codeGenType?: string) => {
     generating.value = true
     streamWarning.value = ''
@@ -48,9 +83,10 @@ export function useSSEChat(options: SSEChatOptions) {
     const isStructuredToolMode =
       codeGenType === 'vue_project' || codeGenType === 'multi-file' || codeGenType === 'single_file'
 
+    const generationMode = mapGenerationMode(codeGenType)
     const baseUrl = import.meta.env.VITE_API_BASE_URL
     const eventSource = new EventSource(
-      `${baseUrl}/app/chat/gen/code/stream?appId=${unref(appId)}&sessionId=${sessionId}&message=${encodeURIComponent(userMsg)}`,
+      `${baseUrl}/app/chat/gen/code/stream?appId=${unref(appId)}&sessionId=${sessionId}&message=${encodeURIComponent(userMsg)}&generationMode=${generationMode}`,
       { withCredentials: true },
     )
     currentEventSource = eventSource
@@ -112,20 +148,16 @@ export function useSSEChat(options: SSEChatOptions) {
         return
       }
 
-      try {
-        const data = JSON.parse(rawData)
-        if (data.d === '[DONE]') {
+      // 提取业务 chunk；兼容 {d: ...} 包装、裸业务 JSON、多段 SSE 合并
+      const fragments = extractBusinessChunk(rawData)
+      for (const fragment of fragments) {
+        if (fragment === '[DONE]') {
           streamCompleted = true
           stopGenerating(true)
-          return
+          continue
         }
-        const chunk = data.d || ''
-        appendStreamChunk(aiMsgIndex, chunk, isStructuredToolMode)
-      } catch {
-        if (rawData.includes('[DONE]')) {
-          streamCompleted = true
-          stopGenerating(true)
-        }
+        if (!fragment) continue
+        appendStreamChunk(aiMsgIndex, fragment, isStructuredToolMode)
       }
     }
 
@@ -148,62 +180,45 @@ export function useSSEChat(options: SSEChatOptions) {
   }
 
   const appendStreamChunk = (aiMsgIndex: number, chunk: string, structuredToolMode: boolean) => {
+    if (!chunk) return
     if (!structuredToolMode) {
       messages.value[aiMsgIndex].content += chunk
       return
     }
-    try {
-      const messageObj = JSON.parse(chunk)
-      const type = messageObj.type
-      if (type === 'ai_response') {
-        const data = messageObj.data || ''
-        if (data !== 'waiting_for_user') {
-          messages.value[aiMsgIndex].content += data
-        }
-        return
+
+    // 解析业务 JSON；如果是多个 JSON 拼接（多 SSE 事件合并到一次 onmessage），
+    // 逐个 JSON 提取并处理。
+    const processJson = (jsonStr: string): boolean => {
+      try {
+        const messageObj = JSON.parse(jsonStr)
+        return dispatchMessageEvent(messageObj, aiMsgIndex)
+      } catch {
+        return false
       }
-      if (type === 'tool_request') {
-        if (messageObj.name === 'ask_user') {
-          const args = parseAskUserArgs(messageObj.arguments)
-          if (!args) return
-          const inputType = args.inputType || 'single_select'
-          const planningJson = JSON.stringify({
-            questions: [
-              {
-                id: 'q1',
-                question: args.question,
-                inputType,
-                required: true,
-                options: (args.options || []).map((o: string) => ({ value: o, label: o })),
-              },
-            ],
-          })
-          messages.value[aiMsgIndex].content += `\n<planning type="clarification">${planningJson}</planning>\n`
-          return
-        }
-        const text = formatToolText(messageObj.name, messageObj.arguments, 'request')
-        appendToolEvent(aiMsgIndex, { type: 'request', text })
-        return
-      }
-      if (type === 'tool_executed') {
-        if (messageObj.name === 'ask_user') return
-        const executedText = formatToolText(messageObj.name, messageObj.arguments, 'executed', messageObj.result)
-        appendToolEvent(aiMsgIndex, { type: 'executed', text: executedText })
-        return
-      }
-      if (type === 'status') {
-        const statusText = messageObj.message || '处理中...'
-        appendToolEvent(aiMsgIndex, { type: 'status', text: statusText })
-        return
-      }
-      if (type === 'workflow_event') {
-        handleWorkflowEvent(messageObj, aiMsgIndex)
-        return
-      }
-      messages.value[aiMsgIndex].content += chunk
-    } catch {
-      messages.value[aiMsgIndex].content += chunk
     }
+
+    if (processJson(chunk)) {
+      return
+    }
+
+    // 尝试分割多个 JSON 对象：{...}{...}{...}
+    const fragments = splitConcatenatedJsonObjects(chunk)
+    if (fragments.length > 1) {
+      let anyProcessed = false
+      for (const fragment of fragments) {
+        if (processJson(fragment)) {
+          anyProcessed = true
+        }
+      }
+      if (anyProcessed) {
+        return
+      }
+    }
+
+    // 仍无法解析：不再把原始 JSON 写入 content 显示给用户；
+    // 退化到静默忽略，避免原始 JSON 刷屏（避免 bug 引起的数据污染）。
+    // 错误仍记录到控制台便于排查。
+    console.warn('[SSE] 收到无法解析的 chunk，已忽略:', chunk.slice(0, 200))
   }
 
   const appendToolEvent = (aiMsgIndex: number, eventItem: ToolEvent) => {
@@ -223,7 +238,83 @@ export function useSSEChat(options: SSEChatOptions) {
     }
   }
 
-  const parseAskUserArgs = (argumentsData?: string | Record<string, unknown>) => {
+  const dispatchMessageEvent = (messageObj: Record<string, unknown>, aiMsgIndex: number): boolean => {
+    const type = messageObj.type
+    if (type === 'ai_response') {
+      const data = (messageObj.data as string) || ''
+      if (data !== 'waiting_for_user') {
+        messages.value[aiMsgIndex].content += data
+      }
+      return true
+    }
+    if (type === 'tool_request') {
+      if (messageObj.name === 'ask_user') {
+        const payload = parseAskUserStructuredPayload(
+          messageObj.arguments as string | Record<string, unknown> | undefined,
+        )
+        if (!payload) return true
+        const targetMessage = messages.value[aiMsgIndex]
+        if (
+          !targetMessage.planning ||
+          targetMessage.planning.questionSetId !== payload.questionSetId
+        ) {
+          targetMessage.planning = payload
+          // 同步生成一段简短说明文本，保持旧 <planning> 标签的兼容
+          targetMessage.content += `\n<planning type="clarification">${JSON.stringify({
+            questions: payload.questions.map((q) => ({
+              id: q.id,
+              question: q.prompt,
+              inputType: q.inputType,
+              required: q.required,
+              options: (q.options || []).map((o) => ({
+                value: o.id,
+                label: o.label,
+                recommended: o.recommended,
+              })),
+            })),
+          })}</planning>\n`
+        }
+        return true
+      }
+      const text = formatToolText(
+        messageObj.name as string | undefined,
+        messageObj.arguments as string | undefined,
+        'request',
+      )
+      appendToolEvent(aiMsgIndex, { type: 'request', text })
+      return true
+    }
+    if (type === 'tool_executed') {
+      if (messageObj.name === 'ask_user') return true
+      const executedText = formatToolText(
+        messageObj.name as string | undefined,
+        messageObj.arguments as string | undefined,
+        'executed',
+        messageObj.result as string | undefined,
+      )
+      appendToolEvent(aiMsgIndex, { type: 'executed', text: executedText })
+      return true
+    }
+    if (type === 'status') {
+      const statusText = (messageObj.message as string) || '处理中...'
+      appendToolEvent(aiMsgIndex, { type: 'status', text: statusText })
+      return true
+    }
+    if (type === 'workflow_event') {
+      handleWorkflowEvent(messageObj, aiMsgIndex)
+      return true
+    }
+    if (type === 'done') {
+      // done 收尾事件；由 eventSource 'done' listener 统一处理
+      return true
+    }
+    // 未知 type：返回 false 让调用方走兜底（静默忽略）
+    return false
+  }
+
+  const parseAskUserStructuredPayload = (
+    argumentsData?: string | Record<string, unknown>,
+  ): PlanningQuestionSet | null => {
     if (!argumentsData) return null
     try {
       let argsObj: Record<string, unknown>
@@ -232,27 +323,58 @@ export function useSSEChat(options: SSEChatOptions) {
       } else {
         argsObj = argumentsData
       }
-      return {
-        question: (argsObj.question as string) || '',
-        inputType: (argsObj.input_type as string) || (argsObj.inputType as string) || 'single_select',
-        options: Array.isArray(argsObj.options) ? (argsObj.options as string[]) : [],
-      }
-    } catch (e) {
-      if (typeof argumentsData === 'string') {
-        try {
-          const normalized = argumentsData.trim().replace(/'/g, '"')
-          const argsObj = JSON.parse(normalized)
-          return {
-            question: (argsObj.question as string) || '',
-            inputType: (argsObj.input_type as string) || (argsObj.inputType as string) || 'single_select',
-            options: Array.isArray(argsObj.options) ? (argsObj.options as string[]) : [],
-          }
-        } catch {
-          // fall through
+      const questionSetId =
+        (argsObj.questionSetId as string) ||
+        ((argsObj.questions as Array<{ id?: string }> | undefined)?.[0]?.id ?? 'qs_legacy')
+      const stage = (argsObj.stage as string) || ''
+      const protocolVersion = Number(argsObj.protocolVersion || 1)
+      const rawQuestions = Array.isArray(argsObj.questions) ? (argsObj.questions as Array<Record<string, unknown>>) : []
+      const questions: PlanningQuestion[] = rawQuestions.map((q) => {
+        const promptText = String(q.prompt || q.question || '')
+        // 兜底归一化 inputType：协议值是 single_select / multi_select。
+        // 后端已对非法值归一化并拒绝 text，但前端再做一次防御，
+        // 防止后端漏处理时直接把 single_choice / select 等变体显示成"无选项"。
+        const rawInputType = String(q.inputType || '').toLowerCase()
+        let inputType: PlanningQuestion['inputType']
+        if (rawInputType === 'multi_select' || rawInputType === 'multi' || rawInputType === 'multiple' || rawInputType.includes('multi')) {
+          inputType = 'multi_select'
+        } else {
+          inputType = 'single_select'
         }
-      }
-      console.warn('[ask_user] parseAskUserArgs failed', argumentsData, e)
+        return {
+          id: String(q.id || ''),
+          prompt: promptText,
+          question: promptText,
+          inputType,
+          required: q.required !== false,
+          reason: (q.reason as string) || '',
+          placeholder: (q.placeholder as string) || '',
+          options: Array.isArray(q.options)
+            ? (q.options as Array<Record<string, unknown>>).map((opt) => ({
+                id: String(opt.id || opt.value || opt.label || ''),
+                label: String(opt.label || opt.id || opt.value || ''),
+                description: (opt.description as string) || '',
+                recommended: Boolean(opt.recommended),
+              }))
+            : [],
+        }
+      })
+      return { questionSetId, stage, protocolVersion, questions }
+    } catch (e) {
+      console.warn('[ask_user] parseAskUserStructuredPayload failed', argumentsData, e)
       return null
+    }
+  }
+
+  const parseAskUserArgs = (argumentsData?: string | Record<string, unknown>) => {
+    const payload = parseAskUserStructuredPayload(argumentsData)
+    if (!payload) return null
+    const first = payload.questions[0]
+    if (!first) return null
+    return {
+      question: first.prompt,
+      inputType: first.inputType,
+      options: (first.options || []).map((o) => o.id),
     }
   }
 

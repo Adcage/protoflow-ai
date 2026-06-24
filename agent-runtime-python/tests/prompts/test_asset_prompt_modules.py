@@ -20,9 +20,7 @@ class TestArtifactOutputContractModule:
         m = ArtifactOutputContractModule()
         result = m.render(None, None)
         assert "Artifact Output Contract" in result
-        assert "entry file exists" in result
-        assert "Card 1" in result
-        assert "Metric A" in result
+        assert "write_file" not in result
 
 
 class TestSelectedSkillModule:

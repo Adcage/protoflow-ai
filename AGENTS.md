@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-ac-ai-code-free 是基于 Spring Boot 3.5.5 + Vue 3 + Python Agent Runtime 的 AI 编程辅助平台，前后端分离并通过 gRPC 连接 Java 平台层与 Python AI Runtime。Java 后端负责 API、权限、平台状态、模型配置、会话、构建部署、文件工具和 gRPC bridge；Python Agent Runtime 负责所有 AI 核心能力，包括模型调用、Agent Graph、提示词增强、代码生成、工具调用决策和 AI 路由。前端使用 Ant Design Vue、Pinia、Axios。
+protoflow-ai 是基于 Spring Boot 3.5.5 + Vue 3 + Python Agent Runtime 的 AI 编程辅助平台，前后端分离并通过 gRPC 连接 Java 平台层与 Python AI Runtime。Java 后端负责 API、权限、平台状态、模型配置、会话、构建部署、文件工具和 gRPC bridge；Python Agent Runtime 负责所有 AI 核心能力，包括模型调用、Agent Graph、提示词增强、代码生成、工具调用决策和 AI 路由。前端使用 Ant Design Vue、Pinia、Axios。
 
 ## AI Runtime 边界（强制）
 
@@ -32,6 +32,171 @@ Java 中原 LangChain4j AI 核心已经遗弃：
 - 禁止让 `java-agent`、`WorkflowCodeGeneratorService`、Java prompt enhancer 或 Java AI routing 成为可用入口或 fallback
 - 旧 Java AI 文件只能作为 deprecated legacy 保留，必须标记 `@Deprecated`，不得新增调用方
 - 如果需要恢复或新增智能路由、提示词增强、图片采集规划等 AI 能力，必须在 Python Runtime 实现，再由 Java 通过 gRPC/HTTP bridge 调用
+
+## Agent Loop 提示词与工具设计约束（强制）
+
+本节适用于 `agent-runtime-python/app/agent_loop/`、`agent-runtime-python/app/prompts/`、Agent Loop 使用的 LangChain Tool、消息组装、事件映射和相关测试。修改这些区域前，必须阅读：
+
+- `docs/agent-loop-redesign/prompt-tool-routing-phased-development-spec.md`
+- `docs/agent-loop-redesign/prompt-hardcoded-tools-audit.md`
+
+如果文档与当前代码不一致，必须先说明差异并确认真实运行路径，禁止按旧文档猜测实现。
+
+### 1. Prompt 与工具定义的职责边界
+
+Prompt 分为两类，职责不得混用：
+
+1. **业务 / 工作流 Prompt**：只描述当前模式的职责、执行顺序、判断条件、门禁、产出要求、禁止事项以及遇到不确定内容时的处理方式。
+2. **动态工具摘要**：只描述当前模型调用实际可用的工具名称、用途和参数，由系统根据本次 `ResolvedToolSet` 和工具 `args_schema` 自动生成。
+
+业务 Prompt 中禁止手写：
+
+- 具体工具名称；
+- 工具参数名、类型、必填性、默认值或枚举；
+- `tool_name(...)`、JSON tool call 等完整调用示例；
+- 当前模式没有绑定的能力，即使以“不要调用某工具”的否定形式出现也不允许；
+- 与动态工具摘要重复的工具使用手册。
+
+错误示例：
+
+```text
+调用 write_file(relative_path="src/App.vue", content="...") 写入文件。
+不要调用 switch_mode，完成后调用 finish。
+```
+
+正确示例：
+
+```text
+按照实施计划逐一写入完整文件；全部计划内容完成后提交当前阶段结果。
+如果计划缺少会影响架构、交互或文件范围的关键信息，提交重新规划请求并说明原因，不得自行补全。
+```
+
+删除工具名时，必须保留原有有效工作流程。禁止为了清除工具名称而删除“何时读取、何时规划、何时实现、何时校验、何时提交阶段结果”等步骤和门禁。如果原步骤违反当前模式权限，应修改步骤语义，而不是只替换文字。
+
+### 2. 工具能力必须按模式和节点动态注入
+
+禁止向所有模式注入同一套工具。每次模型调用必须先根据当前模式、当前节点候选工具和运行环境解析出一个不可变的 `ResolvedToolSet`，并将同一个实例同时用于：
+
+- 模型 `bind_tools()`；
+- System Prompt 中的动态工具摘要；
+- 工具调用执行与权限校验。
+
+不得分别维护“模型工具列表”“Prompt 工具列表”和“执行 handler 列表”。不得在执行层绕过 `ResolvedToolSet` 回退到原始工具注册表或任意 handler。
+
+当前模式职责边界：
+
+| 模式 / 节点 | 允许的能力语义 | 明确禁止 |
+| ----------- | -------------- | -------- |
+| Route | 只读检查工作区并提交结构化路由结论 | 提问用户、写文件、编写计划、直接实现、执行校验修复 |
+| Plan | 只读了解项目、澄清需求、选择能力、写入实施计划 | 写业务文件、直接完成实现、绕过 Route 切换模式 |
+| Implement | 读取和写入项目、执行获准命令、提交完成结果或结构化重新规划请求 | 自行修改模式、伪造校验结果、把关键缺口当作实现细节补全 |
+| Validate | 只读检查项目并提交结构化校验结论 | 写文件、直接修复、绕过 Route 返回 Implement |
+
+相关职责的单一事实源固定为：
+
+| 职责 | 代码位置 |
+| ---- | -------- |
+| 各模式允许 / 必需工具 | `agent-runtime-python/app/agent_loop/tool_policy.py` |
+| 候选工具解析和执行入口 | `agent-runtime-python/app/agent_loop/tool_resolver.py` |
+| 节点候选工具构造和模型绑定 | `agent-runtime-python/app/agent_loop/nodes/step_base.py` 及对应节点 |
+| Prompt profile 模块清单 | `agent-runtime-python/app/prompts/profiles.py` |
+| 动态工具参数摘要 | `agent-runtime-python/app/prompts/tool_summary.py` |
+| Prompt 组合 | `agent-runtime-python/app/prompts/composer.py` |
+| 模式流转提交 | `agent-runtime-python/app/agent_loop/tools/decide_route.py` |
+| 历史工具观察摘要 | `agent-runtime-python/app/agent_loop/message_builder.py` |
+| 工具对外事件分类 | `agent-runtime-python/app/runtime/event_mapper.py` |
+
+调整工具权限时修改 policy、节点候选集合和测试；调整工具参数时修改该工具的 `args_schema`；调整模式工作流时修改对应 Prompt 模块。禁止通过在其他位置复制一份工具清单或参数说明完成修改。
+
+工具参数说明必须来自 `BaseTool.args_schema.model_json_schema()`。动态摘要至少保持字段名、类型、必填 / 可选、默认值、合法枚举与 schema 一致；禁止在 formatter 中按工具名手写参数映射。原生 tool schema 仍由 `bind_tools()` 提交，文本摘要不能替代原生 schema。
+
+### 3. Prompt Profile 和组合规则
+
+生产 Prompt 必须由显式 profile 选择模块，不得注册全部模块后依赖黑名单排除，也不得临时修改 `state.mode` 来影响模块启用条件。
+
+必须保持以下原则：
+
+- `route_initial`、`route_after_plan`、`route_after_implement`、`route_after_validate` 相互隔离；
+- Plan、Implement、Validate 只加载本模式工作流和明确需要的上下文模块；
+- Route 不加载 ProjectRules、Skill、Plan、Implement、Validate 或 Artifact 写入契约；
+- 动态工具摘要模块必须使用本次调用的工具集合构造，禁止使用 registry 中的共享可变工具列表；
+- profile、registry 或必需模块缺失时应返回明确 `STATE_ERROR`，禁止回退到第二套硬编码 Prompt；
+- 禁止恢复 `agent_loop/prompts/` 下的旧 fallback Prompt；
+- 禁止恢复无生产调用方的 `ComposePromptNode` 或为了旧测试保留兼容空壳。
+
+Prompt 中稳定的身份、业务规则和输出约束可以保留，但不得宣称超出当前 `ResolvedToolSet` 的能力。诸如“可读取和写入文件”的全局身份声明必须改为模式无关表述，具体能力由动态摘要说明。
+
+### 4. 工具定义约束
+
+新增或修改工具时必须同时完成以下事项：
+
+1. 使用 Pydantic `args_schema` 定义参数、类型、必填性、默认值、枚举和字段说明；
+2. 工具 `description` 只说明该工具本身做什么、何时适用，不得要求模型继续调用另一个工具；
+3. 工具返回值只报告本次执行结果，不得在返回文本中硬编码下一工具名称或模式跳转指令；
+4. 仅把工具加入确实允许它的模式 policy，禁止为了“模型可能需要”扩大其他模式权限；
+5. 将工具实例加入对应节点候选集合，由 `ModeToolResolver` 过滤；
+6. 在事件映射中明确归类为可见工具、状态工具或隐藏工具，禁止产生 `unclassified tool` 警告；
+7. 补充权限、动态摘要、执行拒绝、事件映射和最终 Prompt 一致性测试；
+8. 如果工具会修改状态，明确字段写权限、设置时机、清理时机、持久化要求和异常行为。
+
+工具是否“必需”表示节点运行时必须能够绑定该能力，不代表模型每轮都必须调用。不得用 `required_tool_names` 强迫与当前分支互斥的终止工具同时执行。
+
+### 5. Route 与状态写权限
+
+`RouteStepNode` 是阶段流转的唯一入口。运行时模式变化必须通过 `apply_route_decision()` 提交，该函数是唯一允许写入以下字段的阶段流转函数：
+
+- `state.mode`；
+- `state.route_decision`；
+- `state.route_decided`；
+- `state.mode_switches`。
+
+`AgentLoopState` 默认值和 `InitNode` 首次初始化是唯一例外，但不得用于阶段间跳转。Plan、Implement、Validate、普通工具、图条件函数和安全回退都不得直接修改模式；安全回退也必须调用 `apply_route_decision()`。
+
+跨阶段意图必须使用结构化状态或专用工具表达，禁止解析自然语言摘要中的关键词决定路由。例如 Implement 发现计划不完整时，应设置结构化重新规划请求和原因；禁止通过检测“需要重新规划”等字符串推断状态。
+
+阶段状态必须有明确生命周期：
+
+- `implement_phase_files` 只统计当前 Implement 阶段成功写入的唯一文件；
+- 仅在 Route 真正进入新的 Implement 阶段时重置，不得在每个 Implement 模型迭代入口清空；
+- 需要跨暂停 / 恢复使用的路由信号、阶段文件和原因必须进入状态序列化；
+- Route 消费结构化信号后负责清理，禁止留下影响下一阶段的 stale flag；
+- 零文件改动不得被历史累计 `files_touched` 伪装成已完成的小修改。
+
+### 6. 工具历史和消息边界
+
+历史 `ToolCallRecord` 只能作为不可执行的观察摘要进入后续模型上下文，禁止恢复成 `AIMessage.tool_calls` / `ToolMessage` 可执行调用对。当前模式权限只由本次 `ResolvedToolSet` 决定，历史上曾经调用过某个工具不代表当前模式拥有该工具。
+
+必须保持：
+
+- 当前用户消息每次模型调用只注入一次；
+- resume 场景补充需求位于历史观察之后并只出现一次；
+- `_stream_invoke()` 是模型文本增量的唯一 producer，上层不得再次发送聚合全文；
+- 写文件内容和大体积工具结果进入历史前必须压缩，禁止把完整源码重新注入 Prompt；
+- 已退休工具只允许作为旧 checkpoint 的兼容输入被忽略，不得重新出现在 policy、schema、生产 Prompt 或事件映射中。
+
+### 7. Prompt 与工具修改的强制测试
+
+任何涉及 Prompt、工具、模式 policy、profile、消息组装或 Route 的修改，至少必须覆盖并运行：
+
+```bash
+cd agent-runtime-python
+pytest tests/agent_loop tests/prompts tests/runtime/test_event_mapper.py tests/architecture
+ruff check app/agent_loop app/prompts app/runtime/event_mapper.py tests/agent_loop tests/prompts tests/runtime/test_event_mapper.py
+```
+
+测试必须验证：
+
+- 七类最终 Prompt：首次 Route、Plan、Plan 后 Route、Implement、Implement 后 Route、Validate、Validate 后 Route；
+- 动态工具摘要名称集合与同次 `ResolvedToolSet.names` 完全一致；
+- Route / Plan / Validate 不包含写工具，Route 不包含提问能力；
+- 伪造或越权工具调用在执行层明确失败，不能只依赖 Prompt 劝阻；
+- 参数摘要与真实 Pydantic schema 一致，包括 enum、required 和 default；
+- 非 Route 代码不能直接提交模式变化；
+- 结构化重新规划、校验失败、默认路由和暂停恢复均走正确状态链路；
+- 新工具不会在事件映射中成为未分类工具；
+- 旧 Prompt、`SwitchModeTool`、`ComposePromptNode` 和硬编码 fallback 不会重新进入生产路径。
+
+禁止通过删除断言、弱化权限、改成字符串快照、只测试单个模块或跳过旧回归测试来使测试通过。最终判断必须基于组合后的真实 Prompt、真实工具集合和真实执行入口，不能只检查 Prompt 模块源码。
 
 ## 构建/测试/开发命令
 

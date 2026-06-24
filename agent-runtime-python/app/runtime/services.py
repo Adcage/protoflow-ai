@@ -17,3 +17,4 @@ class RuntimeServices:
     asset_manager: Any = None
     quality_checker: Any = None
     artifact_writer: Any = None
+    generation_mode_registry: Any = None

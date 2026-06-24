@@ -15,7 +15,13 @@ class FinishNode:
 
     async def __call__(self, state: AgentLoopState) -> AgentLoopState:
         if state.status == "running":
-            state.status = "completed"
+            if state.iteration >= state.max_iterations:
+                state.status = "failed"
+                if not state.final_summary:
+                    state.final_summary = "全局迭代上限已到，任务未能完成"
+            else:
+                state.status = "failed"
+                state.final_summary = state.final_summary or "运行异常终止，未产生有效完成证据"
 
         logger.info(
             "finish | status=%s files=%d iterations=%d switches=%d",
@@ -45,7 +51,6 @@ class FinishNode:
                 )
             )
         else:
-            # AI 总结已通过 TEXT_DELTA 发出
             final_summary = getattr(state, "final_summary", "") or ""
             await self._services.event_bus.emit(
                 RuntimeEvent(RuntimeEventType.DONE,

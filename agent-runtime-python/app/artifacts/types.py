@@ -12,11 +12,13 @@ class ArtifactCheckResult:
 
 @dataclass
 class ArtifactManifest:
-    version: int
-    kind: str
-    title: str
-    entry: str
-    code_gen_type: str
+    version: int = 2
+    kind: str = ""
+    title: str = ""
+    entry: str = ""
+    generation_mode: str = "application"
+    artifact_format: str = ""
+    code_gen_type: str = ""
     supporting_files: list[str] = field(default_factory=list)
     status: str = "complete"
     source_skill_id: str = ""

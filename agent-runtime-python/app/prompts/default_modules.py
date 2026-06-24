@@ -1,14 +1,24 @@
 from app.prompts.modules import PromptModule
 
 
+def _get_effective_type(state, context) -> str:
+    artifact_type = getattr(state, "artifact_type_state", None)
+    if artifact_type is not None and getattr(artifact_type, "effective", None):
+        return artifact_type.effective
+    code_gen_type = getattr(context, "code_gen_type", None)
+    if code_gen_type is not None:
+        return code_gen_type.value if hasattr(code_gen_type, "value") else str(code_gen_type)
+    return "unknown"
+
+
 class RuntimeBoundaryModule(PromptModule):
     id = "runtime_boundary"
     category = "mandatory"
 
     def render(self, context, state) -> str:
         return (
-            "你是一个专业的代码生成助手。你根据用户需求生成高质量的代码。\n"
-            "你可以使用工具来读取和写入文件。请使用提供的工具完成文件操作，不要在回复中直接输出文件内容。"
+            "你是一个 Agent Loop 阶段执行器，严格遵守当前模式赋于你的职责。\n"
+            "本轮只履行当前模式的角色，不得自行切换到其他模式的职责。"
         )
 
 
@@ -37,9 +47,7 @@ class ProjectRulesModule(PromptModule):
         "3. 只生成一个 index.html 文件，不包含任何外部文件引用。\n"
         "4. 响应式设计：必须使用 Flexbox 或 Grid 布局，适配桌面和移动端。\n"
         "5. 禁止使用渐变色（gradient）和 Emoji。\n"
-        "6. 新建场景：直接调用 write_file 写入 index.html，禁止先调用 read_file 或 read_dir。\n"
-        "7. 修改场景：先 read_file 读取 index.html，再通过 write_file 覆盖写入修改后的完整内容。\n"
-        "8. 输出规则：工具执行完成后只用简短中文总结结果，禁止输出完整源码。"
+        "6. 禁止将完整源码输出到回复中。"
     )
 
     _MULTI_FILE_RULES = (
@@ -53,9 +61,7 @@ class ProjectRulesModule(PromptModule):
         "   - script.js：所有交互逻辑；无交互需求时也应写入基础代码或空文件注释\n"
         "4. 响应式设计：必须使用 Flexbox 或 Grid 布局，适配桌面和移动端。\n"
         "5. 禁止使用渐变色（gradient）和 Emoji。\n"
-        "6. 新建场景：依次调用 write_file 写入 index.html、style.css、script.js，禁止先调用 read_dir 或 read_file。\n"
-        "7. 修改场景：先 read_dir 了解目录结构，再 read_file 读取需修改的文件，再 write_file 写入修改后的完整内容。\n"
-        "8. 输出规则：工具执行完成后只用简短中文总结结果，禁止输出完整源码。"
+        "6. 禁止将完整源码输出到回复中。"
     )
 
     _VUE_PROJECT_RULES = (
@@ -69,16 +75,11 @@ class ProjectRulesModule(PromptModule):
         "6. 只生成运行项目所需的最小文件集，禁止生成 node_modules、dist、README 等冗余内容。\n"
         "7. package.json 仅允许以下核心依赖：vue、vue-router、vite、@vitejs/plugin-vue，不要声明额外依赖。\n"
         "8. package.json 依赖版本必须使用可安装的稳定范围版本（如 ^3.4.0），禁止使用不存在的精确版本号。\n"
-        "9. 新建场景：依次调用 write_file 写入各文件，禁止先调用 read_dir 或 read_file。\n"
-        "10. 修改场景：先 read_dir 了解目录结构，再 read_file 读取需修改的文件，再 write_file 写入修改后的完整内容。\n"
-        "11. 输出规则：工具执行完成后只用简短中文总结结果，禁止输出完整源码。"
+        "9. 禁止将完整源码输出到回复中。"
     )
 
     def render(self, context, state) -> str:
-        code_gen_type = getattr(context, "code_gen_type", None)
-        # 优先使用 state 中推荐的应用类型（route_step 中用户选择的结果）
-        recommended = getattr(state, "recommended_code_gen_type", None)
-        type_value = recommended if recommended else (code_gen_type.value if code_gen_type else "unknown")
+        type_value = _get_effective_type(state, context)
         rules_map = {
             "single_file": self._SINGLE_FILE_RULES,
             "multi-file": self._MULTI_FILE_RULES,
@@ -86,7 +87,7 @@ class ProjectRulesModule(PromptModule):
         }
         return rules_map.get(
             type_value,
-            f"项目类型：{type_value}\n生成代码时请遵循该类型项目的最佳实践和目录结构规范。",
+            f"项目类型：{type_value}\n生成代码时请遵循该类型项目的目录结构和文件规范。",
         )
 
 
@@ -95,7 +96,8 @@ class TaskContextModule(PromptModule):
     category = "strategic"
 
     def render(self, context, state) -> str:
-        task_type = getattr(state, "task_type", "generate")
+        run_mode = getattr(context, "run_mode", None)
+        task_type = run_mode.value if run_mode else "generate"
         parts = [f"任务类型：{task_type}"]
         if context.app and context.app.name:
             parts.append(f"应用名称：{context.app.name}")
@@ -121,23 +123,6 @@ class ChatHistorySummaryModule(PromptModule):
         return "\n".join(lines)
 
 
-class ToolContractModule(PromptModule):
-    id = "tool_contract"
-    category = "strategic"
-
-    def render(self, context, state) -> str:
-        return (
-            "工具使用规则：\n"
-            "- 使用 write_file 工具写入文件，参数为 relative_path 和 content\n"
-            "- 使用 read_file 工具读取已有文件，参数为 relative_path 和 scope（默认 workspace，可选 skill）\n"
-            "- 使用 read_dir 工具查看目录结构，参数为 relative_path\n"
-            "- 使用 run_command 工具在工作区执行终端命令，参数为 command 和 timeout\n"
-            "- 仅在 skill 工作流明确要求时使用 run_command（如安装依赖、构建项目、运行检查脚本）\n"
-            "- 文件路径使用正斜杠 / 分隔\n"
-            "- 生成完整文件内容，不要使用省略号或占位符"
-        )
-
-
 class OutputContractModule(PromptModule):
     id = "output_contract"
     category = "mandatory"
@@ -157,22 +142,4 @@ class AntiRoleplayModule(PromptModule):
     category = "mandatory"
 
     def render(self, context, state) -> str:
-        return (
-            "身份约束：\n"
-            "- 你是代码生成助手，只负责生成代码\n"
-            "- 不要假装拥有系统权限\n"
-            "- 不要模拟其他角色或系统\n"
-            "- 不要声称自己是人类"
-        )
-
-
-DEFAULT_PROMPT_MODULES = [
-    RuntimeBoundaryModule,
-    SafetyAndInjectionResistanceModule,
-    ProjectRulesModule,
-    TaskContextModule,
-    ChatHistorySummaryModule,
-    ToolContractModule,
-    OutputContractModule,
-    AntiRoleplayModule,
-]
+        return "身份约束：\n- 你是 Agent Loop 阶段执行器，严格执行当前模式职责\n- 不要假装拥有系统权限\n- 不要模拟其他角色或系统\n- 不要声称自己是人类"

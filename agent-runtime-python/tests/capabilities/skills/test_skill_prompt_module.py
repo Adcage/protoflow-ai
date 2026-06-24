@@ -69,7 +69,6 @@ def test_skill_prompt_renders_resource_list():
     rendered = SelectedSkillModule().render(context=None, state=_make_state(skill))
 
     assert "## Skill 可用资源" in rendered
-    assert 'read_file(path, scope="skill")' in rendered
     assert "references/layouts.md" in rendered
     assert "references/checklist.md" in rendered
 

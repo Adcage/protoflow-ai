@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-ac-ai-code-free 是基于 Spring Boot 3.5.5 + Vue 3 + Python Agent Runtime 的 AI 编程辅助平台，前后端分离并通过 gRPC 连接 Java 平台层与 Python AI Runtime。Java 后端负责 API、权限、平台状态、模型配置、会话、构建部署、文件工具和 gRPC bridge；Python Agent Runtime 负责所有 AI 核心能力，包括模型调用、Agent Graph、提示词增强、代码生成、工具调用决策和 AI 路由。前端使用 Ant Design Vue、Pinia、Axios。
+protoflow-ai 是基于 Spring Boot 3.5.5 + Vue 3 + Python Agent Runtime 的 AI 编程辅助平台，前后端分离并通过 gRPC 连接 Java 平台层与 Python AI Runtime。Java 后端负责 API、权限、平台状态、模型配置、会话、构建部署、文件工具和 gRPC bridge；Python Agent Runtime 负责所有 AI 核心能力，包括模型调用、Agent Graph、提示词增强、代码生成、工具调用决策和 AI 路由。前端使用 Ant Design Vue、Pinia、Axios。
 
 ## AI Runtime 边界（强制）
 

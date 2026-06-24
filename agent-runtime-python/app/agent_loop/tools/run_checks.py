@@ -22,6 +22,7 @@ class RunChecksTool(BaseTool):
     _state: object | None = None
     _workspace_root: str = ""
     _quality_checker: object | None = None
+    _code_gen_type: str = ""
 
     def set_state(self, state) -> None:
         self._state = state
@@ -31,6 +32,17 @@ class RunChecksTool(BaseTool):
 
     def set_quality_checker(self, checker) -> None:
         self._quality_checker = checker
+
+    def set_code_gen_type(self, code_gen_type) -> None:
+        self._code_gen_type = getattr(code_gen_type, "value", str(code_gen_type or ""))
+
+    def _map_code_gen_type_to_format(self, code_gen_type: str) -> str:
+        mapping = {
+            "single_file": "web_single_file",
+            "multi-file": "web_multi_file",
+            "vue_project": "vue_project",
+        }
+        return mapping.get(code_gen_type, code_gen_type)
 
     def _run(self, **kwargs) -> str:
         raise NotImplementedError("Use async version")
@@ -48,23 +60,28 @@ class RunChecksTool(BaseTool):
         # 构建 ArtifactManifest
         from app.artifacts.manifest import ArtifactCollector
 
-        code_gen_type = ""
-        # 优先使用推荐的类型
-        recommended = getattr(state, "recommended_code_gen_type", None)
-        if recommended:
-            code_gen_type = recommended
+        artifact_type_state = getattr(state, "artifact_type_state", None)
+        if artifact_type_state is not None:
+            code_gen_type = artifact_type_state.effective
         else:
-            # 从 _context 获取
-            ctx = getattr(state, "_context", None)
-            if ctx and hasattr(ctx, "code_gen_type"):
-                cgt = getattr(ctx, "code_gen_type", None)
-                code_gen_type = cgt.value if cgt else ""
+            code_gen_type = self._code_gen_type
+
+        generation_mode = "application"
+        envelope = getattr(state, "_state_envelope", None)
+        if envelope is not None:
+            gm = getattr(envelope.workflow, "generation_mode", None)
+            if gm is not None:
+                generation_mode = gm
+
+        artifact_format = self._map_code_gen_type_to_format(code_gen_type)
 
         files_touched = getattr(state, "files_touched", [])
 
         try:
             manifest = ArtifactCollector().build_manifest(
                 code_gen_type=code_gen_type,
+                generation_mode=generation_mode,
+                artifact_format=artifact_format,
                 files_touched=files_touched,
                 workspace_root=self._workspace_root,
             )

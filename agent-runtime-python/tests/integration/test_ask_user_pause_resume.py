@@ -2,9 +2,32 @@ import json
 import pytest
 
 from app.agent_loop.state import AgentLoopState
-from app.agent_loop.graph import route_after_step
+from app.agent_loop.graph import route_after_plan_step
+from app.agent_loop.nodes.init import InitNode
+from app.modeling.resolver import ResolvedModelConfig
+from app.modeling.roles import ModelRole
+from app.runtime.context import CodeGenType, ExecutionContext, RunMode
+from app.runtime.services import RuntimeServices
 from app.agent_loop.tools.ask_user import AskUserTool
 from app.runtime.state import ToolCallRecord
+
+
+class FakeModelResolver:
+    def __init__(self):
+        self.load_calls = 0
+        self.model_config = ResolvedModelConfig(
+            role=ModelRole.PRIMARY,
+            provider="openai",
+            model_name="gpt-4o-mini",
+            base_url="https://api.openai.com/v1",
+            api_key="sk-restored",
+        )
+
+    async def load_bundle(self, context):
+        self.load_calls += 1
+
+    def resolve(self, role):
+        return self.model_config
 
 
 class TestAskUserPauseFlow:
@@ -27,12 +50,12 @@ class TestAskUserPauseFlow:
     def test_route_after_step_routes_to_finish_on_waiting(self):
         """waiting_for_user 状态下路由应返回 finish"""
         state = AgentLoopState(status="waiting_for_user", iteration=3)
-        assert route_after_step(state) == "finish"
+        assert route_after_plan_step(state) == "finish"
 
     def test_route_after_step_waiting_priorities_over_running(self):
         """waiting_for_user 应优先于正常路由"""
         state = AgentLoopState(status="waiting_for_user", mode="plan", iteration=1)
-        assert route_after_step(state) == "finish"
+        assert route_after_plan_step(state) == "finish"
 
     @pytest.mark.asyncio
     async def test_full_pause_flow(self):
@@ -48,18 +71,56 @@ class TestAskUserPauseFlow:
         await tool._arun(question="选择配色方案？", input_type="single_select", options=["深色", "浅色"])
 
         assert state.status == "waiting_for_user"
-        assert route_after_step(state) == "finish"
+        assert route_after_plan_step(state) == "finish"
 
         json_str = state.serialize()
         data = json.loads(json_str)
-        assert data["status"] == "waiting_for_user"
-        assert data["selected_skill_id"] == "ui-ux-pro-max"
-        assert data["implementation_outline"] == {"text": "创建 SaaS 仪表盘"}
-        assert data["iteration"] == 3
+        wf = data["workflow"]
+        assert wf["plan"]["is_waiting_for_user"] is True
+        assert wf["plan"]["selected_skill_id"] == "ui-ux-pro-max"
+        assert wf["plan"]["implementation_outline"] == {"text": "创建 SaaS 仪表盘"}
+        assert wf["iteration"] == 3
 
 
 class TestResumeFlow:
     """测试从暂停状态恢复的完整流程"""
+
+    @pytest.mark.asyncio
+    async def test_resume_reloads_model_when_snapshot_strips_api_key(self):
+        """恢复快照缺少 apiKey 时应重新加载完整模型配置"""
+        original = AgentLoopState(status="waiting_for_user", iteration=2)
+        original.resolved_model = {
+            "provider": "openai",
+            "modelName": "gpt-4o-mini",
+            "baseUrl": "https://api.openai.com/v1",
+            "apiKey": "sk-original",
+        }
+        restored = AgentLoopState.deserialize(original.serialize())
+        restored.status = "running"
+
+        context = ExecutionContext(
+            agent_run_id=1,
+            app_id=1,
+            session_id=1,
+            user_id=1,
+            prompt="继续",
+            code_gen_type=CodeGenType.VUE_PROJECT,
+            workspace_path=".",
+            run_mode=RunMode.GENERATE,
+            is_resume=True,
+        )
+        resolver = FakeModelResolver()
+        services = RuntimeServices(model_resolver=resolver)
+
+        await InitNode(context, services)(restored)
+
+        assert resolver.load_calls == 1
+        assert restored.resolved_model == {
+            "provider": "openai",
+            "modelName": "gpt-4o-mini",
+            "baseUrl": "https://api.openai.com/v1",
+            "apiKey": "sk-restored",
+        }
 
     def test_deserialize_restores_all_persisted_fields(self):
         """反序列化应恢复所有持久化字段"""
@@ -112,9 +173,10 @@ class TestResumeFlow:
         }
         json_str = state.serialize()
         data = json.loads(json_str)
-        assert "apiKey" not in data["resolved_model"]
-        assert data["resolved_model"]["provider"] == "openai"
-        assert data["resolved_model"]["modelName"] == "gpt-4"
+        wf = data["workflow"]
+        assert "apiKey" not in wf["resolved_model"]
+        assert wf["resolved_model"]["provider"] == "openai"
+        assert wf["resolved_model"]["modelName"] == "gpt-4"
 
     def test_resume_resets_status_to_running(self):
         """恢复时应将 status 从 waiting_for_user 重置为 running"""

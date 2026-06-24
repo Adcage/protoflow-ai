@@ -12,6 +12,7 @@
     "openapi": "openapi2ts",
     "preview": "vite preview",
     "build-only": "vite build",
+    "test": "node --test tests/*.unit.test.mjs",
     "test:e2e:chat": "node --test tests/chat-flow.e2e.test.mjs",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix",

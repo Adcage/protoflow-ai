@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12tool_service.proto\x12\x17\x63om.adcage.acaicodefree\x1a\x0c\x63ommon.proto\"u\n\x0fReadFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\"#\n\x10ReadFileResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\"\x87\x01\n\x10WriteFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\"$\n\x11WriteFileResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"\xa1\x01\n\x11ModifyFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12\x13\n\x0bold_content\x18\x04 \x01(\t\x12\x13\n\x0bnew_content\x18\x05 \x01(\t\"%\n\x12ModifyFileResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"w\n\x11\x44\x65leteFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\"%\n\x12\x44\x65leteFileResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"t\n\x0eReadDirRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\"\"\n\x0fReadDirResponse\x12\x0f\n\x07\x65ntries\x18\x01 \x01(\t\"T\n\x12\x42\x61tchWriteResponse\x12\x15\n\rsuccess_count\x18\x01 \x01(\x05\x12\x15\n\rfailure_count\x18\x02 \x01(\x05\x12\x10\n\x08messages\x18\x03 \x03(\t2\xec\x04\n\x0bToolService\x12_\n\x08ReadFile\x12(.com.adcage.acaicodefree.ReadFileRequest\x1a).com.adcage.acaicodefree.ReadFileResponse\x12\x62\n\tWriteFile\x12).com.adcage.acaicodefree.WriteFileRequest\x1a*.com.adcage.acaicodefree.WriteFileResponse\x12\x65\n\nModifyFile\x12*.com.adcage.acaicodefree.ModifyFileRequest\x1a+.com.adcage.acaicodefree.ModifyFileResponse\x12\x65\n\nDeleteFile\x12*.com.adcage.acaicodefree.DeleteFileRequest\x1a+.com.adcage.acaicodefree.DeleteFileResponse\x12\\\n\x07ReadDir\x12\'.com.adcage.acaicodefree.ReadDirRequest\x1a(.com.adcage.acaicodefree.ReadDirResponse\x12l\n\x10StreamWriteFiles\x12).com.adcage.acaicodefree.WriteFileRequest\x1a+.com.adcage.acaicodefree.BatchWriteResponse(\x01\x42%\n!com.adcage.acaicodefree.grpc.toolP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12tool_service.proto\x12\x17\x63om.adcage.acaicodefree\x1a\x0c\x63ommon.proto\"\xb7\x01\n\x0fReadFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12@\n\x0fgeneration_mode\x18\x04 \x01(\x0e\x32\'.com.adcage.acaicodefree.GenerationMode\"#\n\x10ReadFileResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\"\xc9\x01\n\x10WriteFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12@\n\x0fgeneration_mode\x18\x05 \x01(\x0e\x32\'.com.adcage.acaicodefree.GenerationMode\"$\n\x11WriteFileResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"\xe3\x01\n\x11ModifyFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12\x13\n\x0bold_content\x18\x04 \x01(\t\x12\x13\n\x0bnew_content\x18\x05 \x01(\t\x12@\n\x0fgeneration_mode\x18\x06 \x01(\x0e\x32\'.com.adcage.acaicodefree.GenerationMode\"%\n\x12ModifyFileResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"\xb9\x01\n\x11\x44\x65leteFileRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12@\n\x0fgeneration_mode\x18\x04 \x01(\x0e\x32\'.com.adcage.acaicodefree.GenerationMode\"%\n\x12\x44\x65leteFileResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"\xb6\x01\n\x0eReadDirRequest\x12\x0e\n\x06\x61pp_id\x18\x01 \x01(\x03\x12;\n\rcode_gen_type\x18\x02 \x01(\x0e\x32$.com.adcage.acaicodefree.CodeGenType\x12\x15\n\rrelative_path\x18\x03 \x01(\t\x12@\n\x0fgeneration_mode\x18\x04 \x01(\x0e\x32\'.com.adcage.acaicodefree.GenerationMode\"\"\n\x0fReadDirResponse\x12\x0f\n\x07\x65ntries\x18\x01 \x01(\t\"T\n\x12\x42\x61tchWriteResponse\x12\x15\n\rsuccess_count\x18\x01 \x01(\x05\x12\x15\n\rfailure_count\x18\x02 \x01(\x05\x12\x10\n\x08messages\x18\x03 \x03(\t2\xec\x04\n\x0bToolService\x12_\n\x08ReadFile\x12(.com.adcage.acaicodefree.ReadFileRequest\x1a).com.adcage.acaicodefree.ReadFileResponse\x12\x62\n\tWriteFile\x12).com.adcage.acaicodefree.WriteFileRequest\x1a*.com.adcage.acaicodefree.WriteFileResponse\x12\x65\n\nModifyFile\x12*.com.adcage.acaicodefree.ModifyFileRequest\x1a+.com.adcage.acaicodefree.ModifyFileResponse\x12\x65\n\nDeleteFile\x12*.com.adcage.acaicodefree.DeleteFileRequest\x1a+.com.adcage.acaicodefree.DeleteFileResponse\x12\\\n\x07ReadDir\x12\'.com.adcage.acaicodefree.ReadDirRequest\x1a(.com.adcage.acaicodefree.ReadDirResponse\x12l\n\x10StreamWriteFiles\x12).com.adcage.acaicodefree.WriteFileRequest\x1a+.com.adcage.acaicodefree.BatchWriteResponse(\x01\x42%\n!com.adcage.acaicodefree.grpc.toolP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,28 +33,28 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'tool_service_pb2', _globals
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n!com.adcage.acaicodefree.grpc.toolP\001'
-  _globals['_READFILEREQUEST']._serialized_start=61
-  _globals['_READFILEREQUEST']._serialized_end=178
-  _globals['_READFILERESPONSE']._serialized_start=180
-  _globals['_READFILERESPONSE']._serialized_end=215
-  _globals['_WRITEFILEREQUEST']._serialized_start=218
-  _globals['_WRITEFILEREQUEST']._serialized_end=353
-  _globals['_WRITEFILERESPONSE']._serialized_start=355
-  _globals['_WRITEFILERESPONSE']._serialized_end=391
-  _globals['_MODIFYFILEREQUEST']._serialized_start=394
-  _globals['_MODIFYFILEREQUEST']._serialized_end=555
-  _globals['_MODIFYFILERESPONSE']._serialized_start=557
-  _globals['_MODIFYFILERESPONSE']._serialized_end=594
-  _globals['_DELETEFILEREQUEST']._serialized_start=596
-  _globals['_DELETEFILEREQUEST']._serialized_end=715
-  _globals['_DELETEFILERESPONSE']._serialized_start=717
-  _globals['_DELETEFILERESPONSE']._serialized_end=754
-  _globals['_READDIRREQUEST']._serialized_start=756
-  _globals['_READDIRREQUEST']._serialized_end=872
-  _globals['_READDIRRESPONSE']._serialized_start=874
-  _globals['_READDIRRESPONSE']._serialized_end=908
-  _globals['_BATCHWRITERESPONSE']._serialized_start=910
-  _globals['_BATCHWRITERESPONSE']._serialized_end=994
-  _globals['_TOOLSERVICE']._serialized_start=997
-  _globals['_TOOLSERVICE']._serialized_end=1617
+  _globals['_READFILEREQUEST']._serialized_start=62
+  _globals['_READFILEREQUEST']._serialized_end=245
+  _globals['_READFILERESPONSE']._serialized_start=247
+  _globals['_READFILERESPONSE']._serialized_end=282
+  _globals['_WRITEFILEREQUEST']._serialized_start=285
+  _globals['_WRITEFILEREQUEST']._serialized_end=486
+  _globals['_WRITEFILERESPONSE']._serialized_start=488
+  _globals['_WRITEFILERESPONSE']._serialized_end=524
+  _globals['_MODIFYFILEREQUEST']._serialized_start=527
+  _globals['_MODIFYFILEREQUEST']._serialized_end=754
+  _globals['_MODIFYFILERESPONSE']._serialized_start=756
+  _globals['_MODIFYFILERESPONSE']._serialized_end=793
+  _globals['_DELETEFILEREQUEST']._serialized_start=796
+  _globals['_DELETEFILEREQUEST']._serialized_end=981
+  _globals['_DELETEFILERESPONSE']._serialized_start=983
+  _globals['_DELETEFILERESPONSE']._serialized_end=1020
+  _globals['_READDIRREQUEST']._serialized_start=1023
+  _globals['_READDIRREQUEST']._serialized_end=1205
+  _globals['_READDIRRESPONSE']._serialized_start=1207
+  _globals['_READDIRRESPONSE']._serialized_end=1241
+  _globals['_BATCHWRITERESPONSE']._serialized_start=1243
+  _globals['_BATCHWRITERESPONSE']._serialized_end=1327
+  _globals['_TOOLSERVICE']._serialized_start=1330
+  _globals['_TOOLSERVICE']._serialized_end=1950
 # @@protoc_insertion_point(module_scope)

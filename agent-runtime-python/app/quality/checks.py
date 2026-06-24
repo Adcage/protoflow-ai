@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from typing import Callable
 
 from app.artifacts.types import ArtifactManifest
 from app.quality.result import CheckResult
@@ -77,7 +78,7 @@ def check_non_empty_files(workspace_root: str, manifest: ArtifactManifest) -> Ch
 
 
 def check_vue_app_structure(workspace_root: str, manifest: ArtifactManifest) -> CheckResult:
-    if manifest.code_gen_type != "vue_project":
+    if manifest.artifact_format != "vue_project":
         return CheckResult(
             id="vue_app_structure",
             status="pass",
@@ -253,3 +254,13 @@ def check_vue_state_coverage(workspace_root: Path, file_paths: list[str]) -> Che
         severity="warning",
         message="Vue state coverage keywords detected",
     )
+
+
+CHECK_REGISTRY: dict[str, Callable] = {
+    "entry_exists": check_entry_exists,
+    "supporting_files_exist": check_supporting_files_exist,
+    "non_empty_files": check_non_empty_files,
+    "vue_app_structure": check_vue_app_structure,
+    "no_placeholder_text": check_placeholder_text,
+    "artifact_tags_removed": check_artifact_tags_removed,
+}
