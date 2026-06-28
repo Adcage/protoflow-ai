@@ -1,5 +1,5 @@
 <template>
-  <a-config-provider :locale="zhCN" :theme="darkTheme">
+  <a-config-provider :locale="zhCN" :theme="warmTheme">
     <RouterView />
   </a-config-provider>
 </template>
@@ -7,24 +7,31 @@
 <script lang="ts" setup>
 import { RouterView } from 'vue-router'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
-import { theme } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 
 dayjs.locale('zh-cn')
 
-const darkTheme = {
-  algorithm: theme.darkAlgorithm,
+const warmTheme = {
   token: {
-    colorPrimary: '#22C55E',
-    colorBgContainer: '#1E293B',
-    colorBgElevated: '#334155',
-    colorBgLayout: '#0F172A',
-    colorBorder: '#475569',
-    colorText: '#F8FAFC',
-    colorTextSecondary: '#94A3B8',
-    borderRadius: 8,
+    colorPrimary: '#C85A3E',
+    colorInfo: '#5B8BA9',
+    colorSuccess: '#4A9D6B',
+    colorWarning: '#D4944C',
+    colorError: '#C85A3E',
+    colorTextBase: '#1C1815',
+    colorBgBase: '#FDF9F5',
+    colorBgContainer: '#FFFFFF',
+    colorBgElevated: '#FFFFFF',
+    colorBgLayout: '#FDF9F5',
+    colorBorder: '#E8E0D8',
+    colorBorderSecondary: '#F0EBE5',
+    borderRadius: 6,
+    borderRadiusLG: 10,
+    borderRadiusSM: 4,
     fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontSize: 14,
+    controlHeight: 36,
   },
 }
 </script>

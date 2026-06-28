@@ -100,9 +100,9 @@ const handleLogout = () => {
 
 <style scoped>
 .global-header {
-  background: var(--color-surface);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-header-bg);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--color-border-dark);
   padding: 0;
   position: sticky;
   top: 0;
@@ -132,21 +132,22 @@ const handleLogout = () => {
 .logo {
   height: 32px;
   width: auto;
+  filter: brightness(0) invert(1);
 }
 
 .site-title {
   font-family: var(--font-heading);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--color-text);
-  letter-spacing: -0.5px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-on-dark);
+  letter-spacing: -0.3px;
 }
 
 .header-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  margin-left: var(--space-2xl);
+  gap: 2px;
+  margin-left: var(--space-xl);
   flex: 1;
 }
 
@@ -154,8 +155,8 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px var(--space-md);
-  color: var(--color-text-secondary);
+  padding: 8px var(--space-md);
+  color: var(--color-text-on-dark-secondary);
   font-size: 14px;
   font-weight: 500;
   border-radius: var(--radius-sm);
@@ -163,21 +164,34 @@ const handleLogout = () => {
   text-decoration: none;
   line-height: 1;
   cursor: pointer;
+  position: relative;
 }
 
 .nav-link:hover {
-  color: var(--color-text);
-  background: var(--color-surface-elevated);
+  color: var(--color-text-on-dark);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .nav-link-active {
-  color: var(--color-cta);
-  background: rgba(34, 197, 94, 0.1);
+  color: #ffffff;
+  background: transparent;
+}
+
+.nav-link-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 2px;
+  background: var(--color-cta);
+  border-radius: 1px;
 }
 
 .nav-link-active:hover {
-  color: var(--color-cta);
-  background: rgba(34, 197, 94, 0.15);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .header-right {
@@ -202,11 +216,11 @@ const handleLogout = () => {
 }
 
 .user-trigger:hover {
-  background: var(--color-surface-elevated);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .user-name {
-  color: var(--color-text);
+  color: var(--color-text-on-dark);
   font-size: 14px;
   font-weight: 500;
 }
@@ -219,7 +233,7 @@ const handleLogout = () => {
   display: none;
   background: none;
   border: none;
-  color: var(--color-text);
+  color: var(--color-text-on-dark);
   cursor: pointer;
   padding: var(--space-sm);
   border-radius: var(--radius-sm);
@@ -228,15 +242,15 @@ const handleLogout = () => {
 }
 
 .mobile-menu-btn:hover {
-  background: var(--color-surface-elevated);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mobile-nav {
   display: none;
   flex-direction: column;
   padding: var(--space-sm) var(--space-lg);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-header-bg);
+  border-bottom: 1px solid var(--color-border-dark);
 }
 
 .mobile-nav-link {
@@ -244,7 +258,7 @@ const handleLogout = () => {
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-on-dark-secondary);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -253,8 +267,8 @@ const handleLogout = () => {
 }
 
 .mobile-nav-link:hover {
-  color: var(--color-text);
-  background: var(--color-surface-elevated);
+  color: var(--color-text-on-dark);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 @media (max-width: 768px) {

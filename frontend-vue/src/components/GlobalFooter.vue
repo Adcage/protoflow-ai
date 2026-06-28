@@ -45,6 +45,6 @@ import { ExternalLink } from '@lucide/vue'
 }
 
 .github-link:hover {
-  color: var(--color-text);
+  color: var(--color-cta);
 }
 </style>

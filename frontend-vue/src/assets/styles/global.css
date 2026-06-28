@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 *,
 *::before,
@@ -29,6 +29,7 @@ h4,
 h5,
 h6 {
   font-family: var(--font-heading);
+  letter-spacing: -0.3px;
 }
 
 a {
@@ -41,24 +42,26 @@ a:hover {
   color: var(--color-cta-hover);
 }
 
+/* 暖色调滚动条 */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-background);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-light);
-  border-radius: 3px;
+  background: rgba(28, 24, 21, 0.12);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: rgba(28, 24, 21, 0.24);
 }
 
+/* Ant Design 主题适配 */
 .ant-layout {
   background: var(--color-background) !important;
 }
@@ -94,14 +97,21 @@ a:hover {
 
 .ant-input,
 .ant-input-affix-wrapper {
-  background: var(--color-surface-elevated) !important;
+  background: var(--color-surface) !important;
   border-color: var(--color-border) !important;
   color: var(--color-text) !important;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus {
+  border-color: var(--color-cta) !important;
+  box-shadow: 0 0 0 2px var(--color-cta-lighter) !important;
 }
 
 .ant-btn-primary {
   background: var(--color-cta) !important;
   border-color: var(--color-cta) !important;
+  box-shadow: var(--shadow-cta);
 }
 
 .ant-btn-primary:hover {
@@ -109,8 +119,14 @@ a:hover {
   border-color: var(--color-cta-hover) !important;
 }
 
+.ant-btn-primary:active {
+  background: var(--color-cta-hover) !important;
+}
+
 .ant-dropdown-menu {
-  background: var(--color-surface-elevated) !important;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 .ant-dropdown-menu-item {
@@ -118,7 +134,8 @@ a:hover {
 }
 
 .ant-dropdown-menu-item:hover {
-  background: var(--color-surface) !important;
+  background: var(--color-surface-hover) !important;
+  color: var(--color-cta) !important;
 }
 
 .ant-menu-item-selected {
@@ -133,8 +150,12 @@ a:hover {
   color: var(--color-cta) !important;
 }
 
+.ant-pagination .ant-pagination-item-active {
+  border-color: var(--color-cta) !important;
+}
+
 .ant-select-selector {
-  background: var(--color-surface-elevated) !important;
+  background: var(--color-surface) !important;
   border-color: var(--color-border) !important;
   color: var(--color-text) !important;
 }
@@ -149,6 +170,10 @@ a:hover {
 
 .ant-tabs-tab-active .ant-tabs-tab-btn {
   color: var(--color-cta) !important;
+}
+
+.ant-tabs-ink-bar {
+  background: var(--color-cta) !important;
 }
 
 .ant-switch-checked {
@@ -166,6 +191,54 @@ a:hover {
 }
 
 .ant-modal-mask {
-  background: rgba(0, 0, 0, 0.6) !important;
-  backdrop-filter: blur(4px);
+  background: rgba(28, 24, 21, 0.4) !important;
+  backdrop-filter: blur(6px);
+}
+
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--color-border-light) !important;
+}
+
+.ant-modal-title {
+  color: var(--color-text) !important;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.ant-message-notice-content {
+  background: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.ant-popover-inner,
+.ant-tooltip-inner {
+  background: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* 噪点纹理 — 增加温暖手工质感 */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* 全局选中文本 */
+::selection {
+  background: var(--color-cta-lighter);
+  color: var(--color-text);
 }
