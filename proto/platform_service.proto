@@ -84,6 +84,7 @@ message ChatHistoryEntry {
   string role = 2;
   string content = 3;
   int64 created_at = 4;
+  string attachments_json = 5;
 }
 
 message GetChatHistoryRequest {

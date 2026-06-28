@@ -58,3 +58,13 @@ message DoneData {
 message StatusData {
   string message = 1;
 }
+
+message AttachmentInfo {
+  string id = 1;
+  string file_name = 2;
+  int64 file_size = 3;
+  string mime_type = 4;
+  string storage_type = 5;   // "local" | "cos"
+  string storage_path = 6;
+  string url = 7;
+}
