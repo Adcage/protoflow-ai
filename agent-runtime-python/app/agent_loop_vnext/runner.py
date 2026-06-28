@@ -171,12 +171,16 @@ class SingleImplementLoopRunner:
 
     async def _execute_tool_calls(self, tool_calls: list[dict], tools: list, messages: list) -> None:
         """执行工具调用，发射事件，追加 ToolMessage 到消息列表。"""
+        import time
+
         for tc in tool_calls:
             tool_name = tc["name"]
             tool_args = tc["args"]
             tool_id = tc["id"]
 
-            logger.info("tool_call | name=%s id=%s", tool_name, tool_id)
+            # 参数摘要：记录参数名和值长度，不记录完整内容
+            args_summary = {k: (v if len(str(v)) < 100 else str(v)[:100] + "...") for k, v in tool_args.items()}
+            logger.info("tool_call | name=%s id=%s args=%s", tool_name, tool_id, args_summary)
 
             # 发射 TOOL_CALL 事件
             await self._event_bus.emit(RuntimeEvent(
@@ -187,6 +191,7 @@ class SingleImplementLoopRunner:
             # 查找匹配的工具并执行
             result = ""
             tool_found = False
+            start_ms = time.monotonic()
             for tool in tools:
                 if tool.name == tool_name:
                     tool_found = True
@@ -203,6 +208,21 @@ class SingleImplementLoopRunner:
             if not tool_found:
                 result = f"未知工具: {tool_name}"
                 logger.error("unknown tool | name=%s", tool_name)
+
+            duration_ms = int((time.monotonic() - start_ms) * 1000)
+            result_len = len(result) if result else 0
+            result_status = "ok" if tool_found and not result.startswith("工具执行失败:") else "error"
+
+            # INFO：摘要（耗时、结果长度、状态）
+            logger.info(
+                "tool_result | name=%s duration=%dms result_len=%d status=%s",
+                tool_name, duration_ms, result_len, result_status,
+            )
+            # DEBUG：结果前 200 字
+            logger.debug(
+                "tool_result_detail | name=%s result_preview=%s",
+                tool_name, (result[:200] + "...") if result_len > 200 else result,
+            )
 
             # 发射 TOOL_RESULT 事件
             await self._event_bus.emit(RuntimeEvent(
