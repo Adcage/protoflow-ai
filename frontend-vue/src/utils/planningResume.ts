@@ -1,4 +1,5 @@
 const PLANNING_RESUME_MARKER = '<<RESUME_ANSWERS>>'
+const RESUME_JSON_TYPE = 'planning_resume'
 
 export interface PlanningResumePayload {
   questionSetId?: string
@@ -8,6 +9,18 @@ export interface PlanningResumePayload {
 export interface PlanningDisplayAnswer {
   question: string
   answer: string
+}
+
+export function buildPlanningResumeJson(payload: PlanningResumePayload): string {
+  return JSON.stringify({
+    type: RESUME_JSON_TYPE,
+    questionSetId: payload.questionSetId || '',
+    answers: payload.answers,
+  })
+}
+
+export function isPlanningResumeJson(message: string): boolean {
+  return message.startsWith('{') && message.includes(`"${RESUME_JSON_TYPE}"`)
 }
 
 export function buildPlanningResumePrompt(payload: PlanningResumePayload): string {

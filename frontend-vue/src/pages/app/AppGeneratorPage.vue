@@ -108,7 +108,7 @@ import PreviewPanel from '@/components/PreviewPanel.vue'
 import ImagePreviewer from '@/components/ImagePreviewer.vue'
 import { useAppPreview } from '@/composables/useAppPreview'
 import { checkActiveGeneration } from '@/composables/useChatSession'
-import { buildPlanningResumeDisplay, buildPlanningResumePrompt } from '@/utils/planningResume'
+import { buildPlanningResumeJson } from '@/utils/planningResume'
 import type { AttachmentInfo } from '@/utils/chatStreamRequest'
 
 const route = useRoute()
@@ -259,13 +259,18 @@ async function handlePlanningSubmit(answers: Record<string, string>) {
       resumeAnswers[q.id] = a
     }
   }
-  const displayPrompt = buildPlanningResumeDisplay(displayAnswers)
+  const jsonPrompt = buildPlanningResumeJson({
+    questionSetId: latest.questionSetId,
+    answers: resumeAnswers,
+  })
   const sessionId = currentSessionId.value
   if (!sessionId) return
-  messages.value.push({ role: 'user', content: displayPrompt, status: 'success', toolEvents: [] })
+  // 不生成用户消息气泡，将答案注入 AI 消息的 planning.answers
+  const aiMsg = messages.value.findLast(m => m.role === 'ai' && m.planning)
+  if (aiMsg) aiMsg.planning!.answers = resumeAnswers
   previewWarning.value = ''
   previewStatus.value = 'generating'
-  startSSE(displayPrompt, sessionId, app.value?.codeGenType, displayPrompt)
+  startSSE(jsonPrompt, sessionId, app.value?.codeGenType, jsonPrompt)
 }
 
 async function handlePlanConfirm(index: number) {

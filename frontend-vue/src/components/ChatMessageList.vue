@@ -287,6 +287,12 @@ function getPlanningData(index: number): PlanningData | null {
 function getPlanningAnswers(index: number): Record<string, string> | null {
   const data = getPlanningData(index)
   if (!data || data.planningType !== 'clarification') return null
+  // 优先从 planning.answers 取（JSON 格式提交后直接存储在 AI 消息上）
+  const msg = props.messages[index]
+  if (msg?.planning?.answers && Object.keys(msg.planning.answers).length > 0) {
+    return msg.planning.answers
+  }
+  // 回退：从下一条用户消息解析
   const nextUserMsg = props.messages.slice(index + 1).find((m) => m.role === 'user')
   if (!nextUserMsg) return null
   const answers: Record<string, string> = {}

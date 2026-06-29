@@ -8,6 +8,7 @@ import {
   renameSession,
   deleteSession,
 } from '@/api/appController'
+import { isPlanningResumeJson } from '@/utils/planningResume'
 import type { AttachmentInfo } from '@/utils/chatStreamRequest'
 import type { ChatMessage } from '@/types/chat'
 import {
@@ -44,6 +45,30 @@ const toChatMessage = (item: API.ChatHistoryVO): ChatMessage => {
     planning: parsePlanningFromExtra(toolCalls),
     attachments: parseAttachments(item.extra),
   }
+}
+
+/** 后处理：将 planning_resume JSON 消息中的答案注入前一条 AI 消息的 planning.answers，然后移除这些消息。 */
+function injectPlanningAnswers(msgs: ChatMessage[]): ChatMessage[] {
+  const resumeIndices: number[] = []
+  for (let i = 1; i < msgs.length; i++) {
+    const msg = msgs[i]
+    if (msg.role !== 'user') continue
+    if (!msg.content.startsWith('{') || !msg.content.includes('"planning_resume"')) continue
+    try {
+      const data = JSON.parse(msg.content)
+      const answers = data.answers
+      if (!answers || typeof answers !== 'object') continue
+      // 注入前一条 AI 消息
+      for (let j = i - 1; j >= 0; j--) {
+        if (msgs[j].role === 'ai' && msgs[j].planning) {
+          msgs[j].planning!.answers = answers
+          break
+        }
+      }
+      resumeIndices.push(i)
+    } catch { /* skip */ }
+  }
+  return msgs.filter((_, idx) => !resumeIndices.includes(idx))
 }
 
 export interface ActiveGenerationStatus {
@@ -146,7 +171,7 @@ export function useChatSession(appId: string) {
       })
       if (loadRes.data?.code === 0) {
         const historyList = loadRes.data.data?.records || []
-        messages.value = historyList.map(toChatMessage)
+        messages.value = injectPlanningAnswers(historyList.map(toChatMessage))
         currentHistoryPage.value = lastPage
       }
     }

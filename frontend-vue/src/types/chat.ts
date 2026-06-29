@@ -40,6 +40,7 @@ export interface PlanningQuestionSet {
   stage?: string
   protocolVersion?: number
   questions: PlanningQuestion[]
+  answers?: Record<string, string> // 用户已提交的回答，提交后填充
 }
 
 export interface ChatMessage {

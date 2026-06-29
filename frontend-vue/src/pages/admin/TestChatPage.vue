@@ -142,7 +142,7 @@ import ChatInputArea from '@/components/ChatInputArea.vue'
 import PreviewPanel from '@/components/PreviewPanel.vue'
 import { useAppPreview } from '@/composables/useAppPreview'
 import { checkActiveGeneration } from '@/composables/useChatSession'
-import { buildPlanningResumeDisplay, buildPlanningResumePrompt } from '@/utils/planningResume'
+import { buildPlanningResumeJson } from '@/utils/planningResume'
 import { parseChatHistoryAttachments } from '@/utils/chatAttachmentDisplay'
 import ImagePreviewer from '@/components/ImagePreviewer.vue'
 import type { AttachmentInfo } from '@/utils/chatStreamRequest'
@@ -405,7 +405,7 @@ const loadRemoteHistory = async (sessionId: string) => {
   })
   if (res.data?.code === 0) {
     const historyList = res.data.data?.records || []
-    messages.value = historyList.map((item) => {
+    let msgs: ChatMessage[] = historyList.map((item) => {
       const toolCalls = parseToolCallsFromHistory(item.extra, item.toolEvents || [])
       return {
         role: item.messageType === 'user' ? 'user' : ('ai' as const),
@@ -421,6 +421,25 @@ const loadRemoteHistory = async (sessionId: string) => {
         planning: parsePlanningFromExtra(toolCalls),
       }
     })
+    // 将 planning_resume JSON 消息的答案注入前一条 AI 消息，然后移除
+    const resumeIndices: number[] = []
+    for (let i = 1; i < msgs.length; i++) {
+      const msg = msgs[i]
+      if (msg.role !== 'user' || !msg.content.startsWith('{') || !msg.content.includes('"planning_resume"')) continue
+      try {
+        const data = JSON.parse(msg.content)
+        if (data.answers && typeof data.answers === 'object') {
+          for (let j = i - 1; j >= 0; j--) {
+            if (msgs[j].role === 'ai' && msgs[j].planning) {
+              msgs[j].planning!.answers = data.answers
+              break
+            }
+          }
+          resumeIndices.push(i)
+        }
+      } catch { /* skip */ }
+    }
+    messages.value = msgs.filter((_, idx) => !resumeIndices.includes(idx))
     nextTick(() => {
       chatMessageListRef.value?.scrollToBottom()
     })
@@ -591,14 +610,19 @@ async function handlePlanningSubmit(answers: Record<string, string>) {
       resumeAnswers[q.id] = a
     }
   }
-  const displayPrompt = buildPlanningResumeDisplay(displayAnswers)
+  const jsonPrompt = buildPlanningResumeJson({
+    questionSetId: latest.questionSetId,
+    answers: resumeAnswers,
+  })
   const sessionId = currentSessionId.value
   if (!sessionId) return
-  messages.value.push({ role: 'user', content: displayPrompt, status: 'success', toolEvents: [] })
+  // 不生成用户消息气泡，将答案注入 AI 消息的 planning.answers
+  const aiMsg = messages.value.findLast(m => m.role === 'ai' && m.planning)
+  if (aiMsg) aiMsg.planning!.answers = resumeAnswers
   iframeUrl.value = ''
   previewWarning.value = ''
   previewStatus.value = 'generating'
-  startSSE(displayPrompt, sessionId, currentApp.value?.codeGenType, displayPrompt)
+  startSSE(jsonPrompt, sessionId, currentApp.value?.codeGenType, jsonPrompt)
 }
 
 async function handlePlanConfirm(index: number) {
