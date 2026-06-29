@@ -115,26 +115,29 @@ public class PythonAgentRuntime implements CodeGenerationRuntime {
     }
 
     private String mapLegacyEventToStreamMessage(String eventType, Map<String, Object> data) {
+        String agentName = String.valueOf(data.getOrDefault("agentName", ""));
         return switch (eventType) {
             case "ai_response" -> {
                 Object text = data.get("text");
                 if (text == null) text = data.getOrDefault("content", "");
-                yield JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(text)));
+                yield JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(text), agentName));
             }
             case "tool_request" -> JSONUtil.toJsonStr(new ToolRequestMessage(
                     String.valueOf(data.getOrDefault("id", "unknown")),
                     String.valueOf(data.getOrDefault("name", "unknown")),
-                    String.valueOf(data.getOrDefault("arguments", "{}"))
+                    String.valueOf(data.getOrDefault("arguments", "{}")),
+                    agentName
             ));
             case "tool_executed" -> JSONUtil.toJsonStr(new ToolExecutedMessage(
                     String.valueOf(data.getOrDefault("id", "unknown")),
                     String.valueOf(data.getOrDefault("name", "unknown")),
                     String.valueOf(data.getOrDefault("arguments", "{}")),
-                    String.valueOf(data.getOrDefault("result", ""))
+                    String.valueOf(data.getOrDefault("result", "")),
+                    agentName
             ));
-            case "error" -> JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + data.getOrDefault("message", "")));
-            case "done" -> JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(data.getOrDefault("message", ""))));
-            default -> JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(data)));
+            case "error" -> JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + data.getOrDefault("message", ""), agentName));
+            case "done" -> JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(data.getOrDefault("message", "")), agentName));
+            default -> JSONUtil.toJsonStr(new AiResponseMessage(String.valueOf(data), agentName));
         };
     }
 }

@@ -11,8 +11,11 @@ public class StatusMessage extends StreamMessage {
 
     private String message;
 
-    public StatusMessage(String message) {
+    private String agentName;
+
+    public StatusMessage(String message, String agentName) {
         super(StreamMessageTypeEnum.STATUS.getValue());
         this.message = message;
+        this.agentName = agentName;
     }
 }

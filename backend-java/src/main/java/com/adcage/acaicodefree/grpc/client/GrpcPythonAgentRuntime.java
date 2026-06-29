@@ -99,7 +99,8 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
                             "type", "request",
                             "id", req.getId(),
                             "name", req.getName(),
-                            "arguments", req.getArguments()
+                            "arguments", req.getArguments(),
+                            "agentName", event.getAgentName()
                     ));
                 }
                 if (event.getEventType() == com.adcage.acaicodefree.grpc.common.EventType.TOOL_EXECUTED) {
@@ -109,7 +110,8 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
                             "id", exec.getId(),
                             "name", exec.getName(),
                             "arguments", exec.getArguments(),
-                            "result", exec.getResult()
+                            "result", exec.getResult(),
+                            "agentName", event.getAgentName()
                     ));
                 }
 
@@ -127,7 +129,7 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
                 log.error("[Stream] gRPC StreamGenerate error: {}, sessionId={}, textLen={}",
                         t.getMessage(), request.getSessionId(), activeGen.getText().length(), t);
                 activeGen.setCompleted(true);
-                sink.tryEmitNext(JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + t.getMessage())));
+                sink.tryEmitNext(JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + t.getMessage(), "")));
                 sink.tryEmitComplete();
             }
 
@@ -225,21 +227,22 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
     }
 
     private String mapEventToStreamMessageJson(CodeGenerationEvent event) {
+        String agentName = event.getAgentName();
         switch (event.getEventType()) {
             case AI_RESPONSE:
-                return JSONUtil.toJsonStr(new AiResponseMessage(event.getAiResponse().getText()));
+                return JSONUtil.toJsonStr(new AiResponseMessage(event.getAiResponse().getText(), agentName));
             case TOOL_REQUEST:
                 ToolRequestData req = event.getToolRequest();
-                return JSONUtil.toJsonStr(new ToolRequestMessage(req.getId(), req.getName(), req.getArguments()));
+                return JSONUtil.toJsonStr(new ToolRequestMessage(req.getId(), req.getName(), req.getArguments(), agentName));
             case TOOL_EXECUTED:
                 ToolExecutedData exec = event.getToolExecuted();
-                return JSONUtil.toJsonStr(new ToolExecutedMessage(exec.getId(), exec.getName(), exec.getArguments(), exec.getResult()));
+                return JSONUtil.toJsonStr(new ToolExecutedMessage(exec.getId(), exec.getName(), exec.getArguments(), exec.getResult(), agentName));
             case ERROR:
-                return JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + event.getError().getMessage()));
+                return JSONUtil.toJsonStr(new AiResponseMessage("生成失败：" + event.getError().getMessage(), agentName));
             case DONE:
-                return JSONUtil.toJsonStr(new AiResponseMessage(event.getDone().getMessage()));
+                return JSONUtil.toJsonStr(new AiResponseMessage(event.getDone().getMessage(), agentName));
             case STATUS:
-                return JSONUtil.toJsonStr(new StatusMessage(event.getStatus().getMessage()));
+                return JSONUtil.toJsonStr(new StatusMessage(event.getStatus().getMessage(), agentName));
             case AGENT_START:
                 return null;
             default:

@@ -172,7 +172,7 @@ public class AiCodeGeneratorFacade {
         if (sink.isCancelled() || StrUtil.isBlank(token)) {
             return;
         }
-        sink.next(JSONUtil.toJsonStr(new AiResponseMessage(token)));
+        sink.next(JSONUtil.toJsonStr(new AiResponseMessage(token, "")));
     }
 
     private void handleToolExecution(FluxSink<String> sink, ToolExecution toolExecution) {
@@ -182,8 +182,8 @@ public class AiCodeGeneratorFacade {
         String id = toolExecution.request().id();
         String name = toolExecution.request().name();
         String arguments = toolExecution.request().arguments();
-        sink.next(JSONUtil.toJsonStr(new ToolRequestMessage(id, name, arguments)));
-        sink.next(JSONUtil.toJsonStr(new ToolExecutedMessage(id, name, arguments, toolExecution.result())));
+        sink.next(JSONUtil.toJsonStr(new ToolRequestMessage(id, name, arguments, "")));
+        sink.next(JSONUtil.toJsonStr(new ToolExecutedMessage(id, name, arguments, toolExecution.result(), "")));
     }
 
 }
