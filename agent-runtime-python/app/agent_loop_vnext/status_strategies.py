@@ -252,6 +252,21 @@ class ReadonlyCommandStrategy(ToolStatusStrategy):
 
 
 # ---------------------------------------------------------------------------
+# AskUser 策略
+# ---------------------------------------------------------------------------
+
+
+class AskUserStrategy(ToolStatusStrategy):
+    """AskUser 提问策略。"""
+
+    def match(self, tool_name: str) -> bool:
+        return tool_name == "AskUser"
+
+    def get_description(self, tool_name: str, args: dict[str, Any], is_test: bool = False) -> str:
+        return "正在向用户提问"
+
+
+# ---------------------------------------------------------------------------
 # 注册中心
 # ---------------------------------------------------------------------------
 
@@ -259,6 +274,7 @@ _registry: list[ToolStatusStrategy] = [
     FileStrategy(),
     SearchStrategy(),
     SkillStrategy(),
+    AskUserStrategy(),
     BashStrategy(),
 ]
 

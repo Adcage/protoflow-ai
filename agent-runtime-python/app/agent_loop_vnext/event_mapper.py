@@ -35,9 +35,10 @@ _VISIBLE_TOOLS = frozenset({
     "Grep",
     "LoadSkill",
     "Bash",
+    "AskUser",
 })
 
-_HIDDEN_TOOLS = frozenset({"ask_user"})
+_HIDDEN_TOOLS_RESULT = frozenset({"AskUser"})
 
 
 # ---------------------------------------------------------------------------
@@ -138,9 +139,6 @@ class VNextEventMapper(ProtoEventMapper):
         data = sequenced_event.event.data
         tool_name = data.get("name", "")
 
-        if tool_name in _HIDDEN_TOOLS:
-            return []
-
         events: list[code_generation_pb2.CodeGenerationEvent] = []
 
         # 脱敏参数
@@ -187,7 +185,7 @@ class VNextEventMapper(ProtoEventMapper):
         data = sequenced_event.event.data
         tool_name = data.get("name", "")
 
-        if tool_name in _HIDDEN_TOOLS:
+        if tool_name in _HIDDEN_TOOLS_RESULT:
             return []
 
         # TOOL_RESULT 映射为 TOOL_EXECUTED（保持向后兼容）
