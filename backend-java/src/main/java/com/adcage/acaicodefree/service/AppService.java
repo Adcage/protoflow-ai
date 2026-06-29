@@ -2,9 +2,11 @@ package com.adcage.acaicodefree.service;
 
 import com.adcage.acaicodefree.model.dto.app.AppAddRequest;
 import com.adcage.acaicodefree.model.dto.app.AppQueryRequest;
+import com.adcage.acaicodefree.model.dto.app.MarketplaceQueryRequest;
 import com.adcage.acaicodefree.model.dto.chat.ChatHistoryQueryRequest;
 import com.adcage.acaicodefree.model.dto.chat.ChatAttachmentInfo;
 import com.adcage.acaicodefree.model.entity.User;
+import com.adcage.acaicodefree.model.vo.app.MarketplaceAppVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatHistoryVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatSessionVO;
 import com.mybatisflex.core.paginate.Page;
@@ -140,4 +142,47 @@ public interface AppService extends IService<App> {
      * @return 应用分页
      */
     Page<App> listGoodAppPage(long pageNum, long pageSize, AppQueryRequest appQueryRequest);
+
+    /**
+     * 发布应用到探索广场
+     *
+     * @param appId      应用 ID
+     * @param categories 分类列表
+     * @param loginUser  登录用户
+     * @return 是否成功
+     */
+    boolean publishApp(Long appId, List<String> categories, User loginUser);
+
+    /**
+     * 取消发布应用（从探索广场下架）
+     *
+     * @param appId     应用 ID
+     * @param loginUser 登录用户
+     * @return 是否成功
+     */
+    boolean unpublishApp(Long appId, User loginUser);
+
+    /**
+     * 获取所有允许的分类列表
+     *
+     * @return 分类列表
+     */
+    List<String> listCategories();
+
+    /**
+     * 分页查询探索广场应用
+     *
+     * @param request 查询请求
+     * @return 探索广场应用分页
+     */
+    Page<MarketplaceAppVO> listMarketplaceAppVOByPage(MarketplaceQueryRequest request);
+
+    /**
+     * Fork 应用
+     *
+     * @param appId     源应用 ID
+     * @param loginUser 登录用户
+     * @return 新应用 ID
+     */
+    Long forkApp(Long appId, User loginUser);
 }

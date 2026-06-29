@@ -2,6 +2,7 @@ package com.adcage.acaicodefree.service;
 
 import com.mybatisflex.core.service.IService;
 import com.adcage.acaicodefree.model.entity.AgentRun;
+import com.adcage.acaicodefree.model.vo.user.TokenUsageStatsVO;
 
 public interface AgentRunService extends IService<AgentRun> {
 
@@ -22,4 +23,6 @@ public interface AgentRunService extends IService<AgentRun> {
     AgentRun claimLatestPausedRun(Long appId, Long sessionId, Long userId);
 
     boolean hasRunningRun(Long appId, Long sessionId, Long userId);
+
+    TokenUsageStatsVO getTokenUsageStats(Long userId, int days);
 }

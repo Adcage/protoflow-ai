@@ -21,18 +21,24 @@ import com.adcage.acaicodefree.core.generation.ActiveGenerationManager;
 import com.adcage.acaicodefree.core.handler.StreamHandlerExecutor;
 import com.adcage.acaicodefree.exception.BusinessException;
 import com.adcage.acaicodefree.exception.ThrowUtils;
+import com.adcage.acaicodefree.mapper.AgentRunMapper;
+import com.adcage.acaicodefree.mapper.AppCategoryMapper;
 import com.adcage.acaicodefree.mapper.ChatHistoryMapper;
 import com.adcage.acaicodefree.mapper.ChatSessionMapper;
 import com.adcage.acaicodefree.model.dto.app.AppAddRequest;
+import com.adcage.acaicodefree.model.dto.app.MarketplaceQueryRequest;
 import com.adcage.acaicodefree.model.dto.chat.ChatAttachmentInfo;
 import com.adcage.acaicodefree.model.dto.chat.ChatHistoryQueryRequest;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
 import com.adcage.acaicodefree.model.dto.app.AppQueryRequest;
+import com.adcage.acaicodefree.model.entity.AgentRun;
+import com.adcage.acaicodefree.model.entity.AppCategory;
 import com.adcage.acaicodefree.model.entity.ChatHistory;
 import com.adcage.acaicodefree.model.entity.ChatSession;
 import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.vo.app.AppVO;
 import com.adcage.acaicodefree.model.vo.app.ArtifactManifestVO;
+import com.adcage.acaicodefree.model.vo.app.MarketplaceAppVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatHistoryVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatSessionVO;
 import com.adcage.acaicodefree.model.vo.chat.ToolEventVO;
@@ -41,7 +47,6 @@ import com.adcage.acaicodefree.runtime.CodeGenerationRequest;
 import com.adcage.acaicodefree.runtime.CodeGenerationRuntime;
 import com.adcage.acaicodefree.runtime.CodeGenerationRuntimeRouter;
 import com.adcage.acaicodefree.service.AgentRunService;
-import com.adcage.acaicodefree.model.entity.AgentRun;
 import com.mybatisflex.core.paginate.Page;
 import com.adcage.acaicodefree.service.UserService;
 import com.adcage.acaicodefree.service.ScreenshotService;
@@ -60,8 +65,9 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -81,6 +87,15 @@ import java.util.stream.Collectors;
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     private static final Logger log = LoggerFactory.getLogger(AppServiceImpl.class);
+
+    private static final List<String> ALLOWED_CATEGORIES = List.of("工具", "游戏", "社交", "教育", "商业", "创意");
+
+    private static final Set<String> FORK_EXCLUDED_DIRS = Set.of(
+            "node_modules", ".git", "dist", "build", "target", ".mvn", ".idea", ".vscode", ".cache");
+
+    private static final Set<String> FORK_EXCLUDED_FILE_NAMES = Set.of(".ds_store", ".env");
+
+    private static final Set<String> FORK_EXCLUDED_FILE_EXTENSIONS = Set.of(".log", ".tmp", ".cache");
 
     @Resource
     private UserService userService;
@@ -114,6 +129,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private ArtifactManifestReader artifactManifestReader;
+
+    @Resource
+    private AppCategoryMapper appCategoryMapper;
+
+    @Resource
+    private AgentRunMapper agentRunMapper;
 
     @Value("${server.port:8700}")
     private String serverPort;
@@ -683,6 +704,184 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         return page(Page.of(pageNum, pageSize), queryWrapper);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean publishApp(Long appId, List<String> categories, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限操作该应用");
+        // 校验分类
+        if (CollUtil.isNotEmpty(categories)) {
+            for (String category : categories) {
+                ThrowUtils.throwIf(!ALLOWED_CATEGORIES.contains(category), ErrorCode.PARAMS_ERROR,
+                        "不支持的分类：" + category);
+            }
+        }
+        // 更新为公开
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setIsPublic(1);
+        boolean updated = this.updateById(updateApp);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "发布应用失败");
+        // 处理分类：先删除旧分类，再批量插入新分类
+        appCategoryMapper.deleteByQuery(QueryWrapper.create().eq("appId", appId));
+        if (CollUtil.isNotEmpty(categories)) {
+            for (String category : categories) {
+                AppCategory appCategory = AppCategory.builder()
+                        .appId(appId)
+                        .category(category)
+                        .build();
+                appCategoryMapper.insert(appCategory);
+            }
+        }
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean unpublishApp(Long appId, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限操作该应用");
+        // 更新为不公开
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setIsPublic(0);
+        boolean updated = this.updateById(updateApp);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "取消发布应用失败");
+        // 清理分类
+        appCategoryMapper.deleteByQuery(QueryWrapper.create().eq("appId", appId));
+        return true;
+    }
+
+    @Override
+    public List<String> listCategories() {
+        return ALLOWED_CATEGORIES;
+    }
+
+    @Override
+    public Page<MarketplaceAppVO> listMarketplaceAppVOByPage(MarketplaceQueryRequest request) {
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        int pageNum = Math.max(request.getPageNum(), 1);
+        int pageSize = Math.min(Math.max(request.getPageSize(), 1), 50);
+        String category = request.getCategory();
+        String sortField = request.getSortField();
+
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq("isPublic", 1);
+
+        // 分类筛选
+        if (StrUtil.isNotBlank(category)) {
+            List<AppCategory> appCategories = appCategoryMapper.selectListByQuery(
+                    QueryWrapper.create().eq("category", category));
+            if (CollUtil.isEmpty(appCategories)) {
+                // 无匹配分类，返回空页
+                return new Page<>(pageNum, pageSize, 0);
+            }
+            List<Long> appIds = appCategories.stream()
+                    .map(AppCategory::getAppId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            queryWrapper.in("id", appIds);
+        }
+
+        // 排序
+        if ("popular".equals(sortField)) {
+            queryWrapper.orderBy("forkCount", false);
+            queryWrapper.orderBy("createTime", false);
+        } else {
+            queryWrapper.orderBy("createTime", false);
+        }
+
+        Page<App> appPage = page(Page.of(pageNum, pageSize), queryWrapper);
+        List<MarketplaceAppVO> records = appPage.getRecords().stream().map(app -> {
+            MarketplaceAppVO vo = new MarketplaceAppVO();
+            vo.setId(app.getId());
+            vo.setAppName(app.getAppName());
+            vo.setCover(app.getCover());
+            vo.setInitPrompt(app.getInitPrompt());
+            vo.setCodeGenType(app.getCodeGenType());
+            vo.setForkCount(app.getForkCount());
+            vo.setCreateTime(app.getCreateTime());
+            // 查询分类
+            List<AppCategory> appCategories = appCategoryMapper.selectListByQuery(
+                    QueryWrapper.create().eq("appId", app.getId()));
+            vo.setCategories(appCategories.stream()
+                    .map(AppCategory::getCategory)
+                    .collect(Collectors.toList()));
+            // 查询用户
+            if (app.getUserId() != null) {
+                User user = userService.getById(app.getUserId());
+                vo.setUser(userService.getUserVO(user));
+            }
+            return vo;
+        }).collect(Collectors.toList());
+
+        Page<MarketplaceAppVO> resultPage = new Page<>(pageNum, pageSize, appPage.getTotalRow());
+        resultPage.setRecords(records);
+        return resultPage;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long forkApp(Long appId, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        // 1. 查源 App
+        App sourceApp = this.getById(appId);
+        ThrowUtils.throwIf(sourceApp == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        ThrowUtils.throwIf(sourceApp.getIsPublic() == null || sourceApp.getIsPublic() != 1,
+                ErrorCode.NO_AUTH_ERROR, "该应用未公开，无法 Fork");
+        // 2. 查源 App 最近 completed 的 AgentRun
+        AgentRun latestRun = agentRunMapper.selectOneByQuery(
+                QueryWrapper.create()
+                        .eq("appId", appId)
+                        .eq("status", "completed")
+                        .orderBy("createTime", false)
+                        .limit(1));
+        // 3. 检查工作区目录是否存在
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(sourceApp.getCodeGenType());
+        String workspacePath = workspaceProperties.getAgentWorkspaceDir() + "/" +
+                getCodeGenOutputPrefix(codeGenTypeEnum != null ? codeGenTypeEnum : CodeGenTypeEnum.SINGLE_FILE) + "/" + appId;
+        Path sourceWorkspacePath = Path.of(workspacePath).toAbsolutePath().normalize();
+        ThrowUtils.throwIf(!Files.exists(sourceWorkspacePath), ErrorCode.NOT_FOUND_ERROR, "源应用工作区不存在，资源丢失");
+        // 4. 创建新 App 记录
+        App newApp = new App();
+        newApp.setAppName(sourceApp.getAppName() + " [副本]");
+        newApp.setInitPrompt(sourceApp.getInitPrompt());
+        newApp.setCodeGenType(sourceApp.getCodeGenType());
+        newApp.setGenerationMode(sourceApp.getGenerationMode());
+        newApp.setStyleTemplate(sourceApp.getStyleTemplate());
+        newApp.setUserId(loginUser.getId());
+        newApp.setIsPublic(0);
+        newApp.setForkCount(0);
+        newApp.setSourceAppId(appId);
+        newApp.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
+        boolean saveResult = this.save(newApp);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.OPERATION_ERROR, "Fork 应用失败");
+        // 5. 复制工作区文件到新目录
+        String newWorkspacePath = workspaceProperties.getAgentWorkspaceDir() + "/" +
+                getCodeGenOutputPrefix(codeGenTypeEnum != null ? codeGenTypeEnum : CodeGenTypeEnum.SINGLE_FILE) + "/" + newApp.getId();
+        Path targetPath = Path.of(newWorkspacePath).toAbsolutePath().normalize();
+        try {
+            copyWorkspaceDir(sourceWorkspacePath, targetPath);
+        } catch (IOException e) {
+            log.error("Fork 工作区复制失败, sourceAppId={}, newAppId={}", appId, newApp.getId(), e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Fork 工作区复制失败：" + e.getMessage());
+        }
+        // 6. 更新源 App forkCount
+        App updateSourceApp = new App();
+        updateSourceApp.setId(appId);
+        updateSourceApp.setForkCount((sourceApp.getForkCount() != null ? sourceApp.getForkCount() : 0) + 1);
+        this.updateById(updateSourceApp);
+        // 7. 返回新应用 ID
+        return newApp.getId();
+    }
+
     private void enrichFromManifest(AppVO appVO, App app) {
         if (app.getId() == null || app.getCodeGenType() == null) {
             return;
@@ -739,6 +938,41 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    private void copyWorkspaceDir(Path source, Path target) throws IOException {
+        Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                String dirName = dir.getFileName().toString().toLowerCase();
+                if (FORK_EXCLUDED_DIRS.contains(dirName)) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                Path targetDir = target.resolve(source.relativize(dir));
+                try {
+                    Files.createDirectories(targetDir);
+                } catch (IOException e) {
+                    throw new RuntimeException("创建目录失败：" + targetDir, e);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                String fileName = file.getFileName().toString().toLowerCase();
+                if (FORK_EXCLUDED_FILE_NAMES.contains(fileName)) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                for (String ext : FORK_EXCLUDED_FILE_EXTENSIONS) {
+                    if (fileName.endsWith(ext)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                }
+                Path targetFile = target.resolve(source.relativize(file));
+                Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private String buildDeployUrl(String deployKey) {

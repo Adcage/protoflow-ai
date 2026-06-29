@@ -12,8 +12,10 @@ import com.adcage.acaicodefree.exception.ThrowUtils;
 import com.adcage.acaicodefree.model.dto.user.*;
 import com.adcage.acaicodefree.model.entity.User;
 import com.adcage.acaicodefree.model.vo.user.LoginUserVO;
+import com.adcage.acaicodefree.model.vo.user.TokenUsageStatsVO;
 import com.adcage.acaicodefree.model.vo.user.UsageStatsVO;
 import com.adcage.acaicodefree.model.vo.user.UserVO;
+import com.adcage.acaicodefree.service.AgentRunService;
 import com.adcage.acaicodefree.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
@@ -35,6 +37,9 @@ public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AgentRunService agentRunService;
 
     /**
      * 用户注册
@@ -255,6 +260,15 @@ public class UserController {
         User loginUser = userService.getLoginUser(request);
         UsageStatsVO usageStats = userService.getUsageStats(loginUser.getId());
         return ResultUtils.success(usageStats);
+    }
+
+    @GetMapping("/usage/token/stats")
+    public BaseResponse<TokenUsageStatsVO> getTokenUsageStats(
+            @RequestParam(defaultValue = "7") int days, HttpServletRequest request) {
+        ThrowUtils.throwIf(days != 7 && days != 30 && days != 90, ErrorCode.PARAMS_ERROR, "时间范围仅支持 7/30/90 天");
+        User loginUser = userService.getLoginUser(request);
+        TokenUsageStatsVO tokenStats = agentRunService.getTokenUsageStats(loginUser.getId(), days);
+        return ResultUtils.success(tokenStats);
     }
 
 }

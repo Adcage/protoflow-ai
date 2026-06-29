@@ -124,4 +124,24 @@ public class App implements Serializable {
     @Column("isTestApp")
     private Integer isTestApp;
 
+    /**
+     * 是否公开（探索广场）
+     */
+    @Column("isPublic")
+    @Builder.Default
+    private Integer isPublic = 0;
+
+    /**
+     * Fork 数
+     */
+    @Column("forkCount")
+    @Builder.Default
+    private Integer forkCount = 0;
+
+    /**
+     * Fork 来源应用 ID
+     */
+    @Column("sourceAppId")
+    private Long sourceAppId;
+
 }

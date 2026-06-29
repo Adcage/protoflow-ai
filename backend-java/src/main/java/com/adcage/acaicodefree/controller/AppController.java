@@ -24,7 +24,9 @@ import com.adcage.acaicodefree.model.dto.chat.ChatHistoryQueryRequest;
 import com.adcage.acaicodefree.model.dto.chat.ChatSessionCreateRequest;
 import com.adcage.acaicodefree.model.dto.chat.ChatSessionRenameRequest;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
+import com.adcage.acaicodefree.model.dto.app.MarketplaceQueryRequest;
 import com.adcage.acaicodefree.model.vo.app.AppVO;
+import com.adcage.acaicodefree.model.vo.app.MarketplaceAppVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatHistoryVO;
 import com.adcage.acaicodefree.model.vo.chat.ChatSessionVO;
 import com.adcage.acaicodefree.core.generation.ActiveGeneration;
@@ -648,6 +650,45 @@ public class AppController {
         Page<App> appPage = appService.page(Page.of(pageNum, pageSize),
                 appService.getQueryWrapper(appQueryRequest));
         return ResultUtils.success(appPage);
+    }
+
+    // endregion
+
+    // region 探索广场
+
+    @PostMapping("/publish")
+    public BaseResponse<Boolean> publishApp(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        Long appId = Long.parseLong(body.get("appId").toString());
+        @SuppressWarnings("unchecked")
+        List<String> categories = body.get("categories") != null ? (List<String>) body.get("categories") : List.of();
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(appService.publishApp(appId, categories, loginUser));
+    }
+
+    @PostMapping("/unpublish")
+    public BaseResponse<Boolean> unpublishApp(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        Long appId = Long.parseLong(body.get("appId").toString());
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(appService.unpublishApp(appId, loginUser));
+    }
+
+    @GetMapping("/categories")
+    public BaseResponse<List<String>> listCategories() {
+        return ResultUtils.success(appService.listCategories());
+    }
+
+    @PostMapping("/marketplace/list/page/vo")
+    public BaseResponse<Page<MarketplaceAppVO>> listMarketplaceAppVOByPage(
+            @RequestBody MarketplaceQueryRequest marketplaceQueryRequest) {
+        Page<MarketplaceAppVO> page = appService.listMarketplaceAppVOByPage(marketplaceQueryRequest);
+        return ResultUtils.success(page);
+    }
+
+    @PostMapping("/fork")
+    public BaseResponse<Long> forkApp(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        Long appId = Long.parseLong(body.get("appId").toString());
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(appService.forkApp(appId, loginUser));
     }
 
     // endregion
