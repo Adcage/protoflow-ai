@@ -4,13 +4,19 @@ import com.adcage.acaicodefree.common.ErrorCode;
 import com.adcage.acaicodefree.exception.ThrowUtils;
 import com.adcage.acaicodefree.mapper.AgentRunMapper;
 import com.adcage.acaicodefree.model.entity.AgentRun;
+import com.adcage.acaicodefree.model.vo.user.DailyTokenUsageVO;
+import com.adcage.acaicodefree.model.vo.user.TokenUsageStatsVO;
 import com.adcage.acaicodefree.service.AgentRunService;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class AgentRunServiceImpl extends ServiceImpl<AgentRunMapper, AgentRun> implements AgentRunService {
@@ -134,5 +140,60 @@ public class AgentRunServiceImpl extends ServiceImpl<AgentRunMapper, AgentRun> i
                 .eq("sessionId", sessionId)
                 .eq("userId", userId)
                 .eq("status", "running")) > 0;
+    }
+
+    @Override
+    public TokenUsageStatsVO getTokenUsageStats(Long userId, int days) {
+        TokenUsageStatsVO statsVO = new TokenUsageStatsVO();
+
+        Map<String, Object> statsMap = mapper.selectTokenStatsByUserId(userId, days);
+        if (statsMap != null) {
+            long totalInputTokens = toLong(statsMap.get("totalInputTokens"));
+            long totalOutputTokens = toLong(statsMap.get("totalOutputTokens"));
+            long totalCacheReadTokens = toLong(statsMap.get("totalCacheReadTokens"));
+            long totalCacheCreationTokens = toLong(statsMap.get("totalCacheCreationTokens"));
+
+            statsVO.setTotalInputTokens(totalInputTokens);
+            statsVO.setTotalOutputTokens(totalOutputTokens);
+            statsVO.setTotalCacheReadTokens(totalCacheReadTokens);
+            statsVO.setTotalCacheCreationTokens(totalCacheCreationTokens);
+            statsVO.setTotalRuns(toLong(statsMap.get("totalRuns")));
+            statsVO.setAvgLatencyMs(toDouble(statsMap.get("avgLatencyMs")));
+
+            // 缓存命中率 = cacheReadTokens / (inputTokens + cacheReadTokens)
+            long totalInput = totalInputTokens + totalCacheReadTokens;
+            if (totalInput > 0) {
+                statsVO.setCacheHitRate(Math.round(totalCacheReadTokens * 10000.0 / totalInput) / 100.0);
+            } else {
+                statsVO.setCacheHitRate(0.0);
+            }
+        } else {
+            statsVO.setTotalInputTokens(0L);
+            statsVO.setTotalOutputTokens(0L);
+            statsVO.setTotalCacheReadTokens(0L);
+            statsVO.setTotalCacheCreationTokens(0L);
+            statsVO.setTotalRuns(0L);
+            statsVO.setAvgLatencyMs(0.0);
+            statsVO.setCacheHitRate(0.0);
+        }
+
+        List<DailyTokenUsageVO> dailyUsage = mapper.selectDailyTokenUsageByUserId(userId, days);
+        statsVO.setDailyTokenUsage(dailyUsage != null ? dailyUsage : new ArrayList<>());
+
+        return statsVO;
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) return 0L;
+        if (value instanceof BigDecimal) return ((BigDecimal) value).longValue();
+        if (value instanceof Number) return ((Number) value).longValue();
+        return Long.parseLong(value.toString());
+    }
+
+    private Double toDouble(Object value) {
+        if (value == null) return 0.0;
+        if (value instanceof BigDecimal) return ((BigDecimal) value).doubleValue();
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        return Double.parseDouble(value.toString());
     }
 }
