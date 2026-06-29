@@ -65,6 +65,10 @@ class HistoryBuilder:
         normalized = role.strip().lower()
         if normalized in {"assistant", "ai"}:
             return AIMessage(content=content)
+        # vNext resume 答案渲染（自包含，不依赖 legacy）
+        if "<<RESUME_ANSWERS>>" in content:
+            from app.agent_loop_vnext.shared.resume_answers import render_resume_answer_text
+            content = render_resume_answer_text(content)
         # 用户消息可能包含附件
         if attachments:
             return await self._build_user_message(content, attachments)
