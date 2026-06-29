@@ -146,6 +146,21 @@ const isReadonly = computed(() => {
   return props.readonlyAnswers !== null && props.readonlyAnswers !== undefined && Object.keys(props.readonlyAnswers).length > 0
 })
 
+const currentQuestion = computed(() => props.questions[currentStep.value])
+
+const currentAnswer = computed({
+  get: () => {
+    if (currentQuestion.value.inputType === 'multi_select') return multiSelected.value.join(',')
+    if (showCustomInput.value && customAnswer.value) return customAnswer.value
+    return singleAnswers.value[currentQuestion.value.id] || ''
+  },
+  set: (val: string) => {
+    if (currentQuestion.value.inputType === 'single_select') {
+      singleAnswers.value[currentQuestion.value.id] = val
+    }
+  },
+})
+
 watch(
   () => props.readonlyAnswers,
   (answers) => {
@@ -156,8 +171,6 @@ watch(
   },
   { immediate: true },
 )
-
-const currentQuestion = computed(() => props.questions[currentStep.value])
 
 function optionKey(opt: PlanningOption): string {
   return opt.id || opt.value || opt.label
@@ -178,19 +191,6 @@ function isSelectedMulti(opt: PlanningOption): boolean {
 function selectOption(opt: PlanningOption): void {
   currentAnswer.value = getOptionId(opt)
 }
-
-const currentAnswer = computed({
-  get: () => {
-    if (currentQuestion.value.inputType === 'multi_select') return multiSelected.value.join(',')
-    if (showCustomInput.value && customAnswer.value) return customAnswer.value
-    return singleAnswers.value[currentQuestion.value.id] || ''
-  },
-  set: (val: string) => {
-    if (currentQuestion.value.inputType === 'single_select') {
-      singleAnswers.value[currentQuestion.value.id] = val
-    }
-  },
-})
 
 const hasCurrentAnswer = computed(() => {
   if (!currentQuestion.value.required) return true
