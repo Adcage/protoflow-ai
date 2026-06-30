@@ -34,7 +34,6 @@ const TOOL_REQUEST_TEXT: Record<string, string> = {
   run_command: '正在执行命令',
 }
 
-/** Agent 名称中文映射 */
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
   implementor: '实现',
   planner: '规划',
@@ -51,7 +50,6 @@ const AGENT_BADGE_TEXT: Record<string, string> = {
   architect: '构',
 }
 
-/** 获取 Agent 中文显示名 */
 export function getAgentDisplayName(agentName: string): string {
   return AGENT_DISPLAY_NAMES[agentName] || agentName
 }
@@ -168,25 +166,19 @@ export function formatToolCallDescription(
   const path = parsePathFromArguments(argumentsText)
   const basename = path ? path.split('/').pop() || path : ''
 
-  let desc = ''
-
   if (basename) {
-    if (toolName === 'Read' || toolName === 'read_file' || toolName === 'readFile') desc = `正在查看 ${basename}`
-    else if (toolName === 'Write' || toolName === 'write_file' || toolName === 'writeFile') desc = `正在写入 ${basename}`
-    else if (toolName === 'Edit' || toolName === 'modify_file' || toolName === 'modifyFile') desc = `正在修改 ${basename}`
-    else if (toolName === 'Insert' || toolName === 'insert') desc = `正在插入 ${basename}`
-    else if (toolName === 'delete_file' || toolName === 'deleteFile') desc = `正在删除 ${basename}`
+    if (toolName === 'Read' || toolName === 'read_file' || toolName === 'readFile') return `正在查看 ${basename}`
+    if (toolName === 'Write' || toolName === 'write_file' || toolName === 'writeFile') return `正在写入 ${basename}`
+    if (toolName === 'Edit' || toolName === 'modify_file' || toolName === 'modifyFile') return `正在修改 ${basename}`
+    if (toolName === 'Insert' || toolName === 'insert') return `正在插入 ${basename}`
+    if (toolName === 'delete_file' || toolName === 'deleteFile') return `正在删除 ${basename}`
   }
 
-  if (!desc) {
-    if (stage === 'executed' && toolName) {
-      desc = TOOL_REQUEST_TEXT[toolName] || `已执行 ${toolName}`
-    } else {
-      desc = TOOL_REQUEST_TEXT[toolName || ''] || `正在执行 ${toolName || '工具'}`
-    }
+  if (stage === 'executed' && toolName) {
+    return TOOL_REQUEST_TEXT[toolName] || `已执行 ${toolName}`
   }
 
-  return desc
+  return TOOL_REQUEST_TEXT[toolName || ''] || `正在执行 ${toolName || '工具'}`
 }
 
 function parseStructuredToolCalls(extra?: string | null): ToolCallRecord[] {
@@ -215,7 +207,7 @@ function parseStructuredToolCalls(extra?: string | null): ToolCallRecord[] {
           type,
           id,
           name,
-          description: formatToolCallDescription(name, argumentsText, 'request', undefined),
+          description: formatToolCallDescription(name, argumentsText, 'request'),
           arguments: argumentsText,
           result,
           status: type === 'executed' ? 'completed' : 'running',

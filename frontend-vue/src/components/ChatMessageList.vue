@@ -379,7 +379,7 @@ function getMessageToolSummary(msg: ChatMessage) {
 }
 
 function getMessageAgentSummary(msg: ChatMessage) {
-  return buildMessageAgentSummary(msg.toolCalls, msg.agentName)
+  return buildMessageAgentSummary(msg.toolCalls, msg.agentName || msg.currentAgent)
 }
 
 function shouldShowTooling(msg: ChatMessage) {

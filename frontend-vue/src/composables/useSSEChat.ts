@@ -448,6 +448,16 @@ export function useSSEChat(options: SSEChatOptions) {
       }
       return true
     }
+    if (type === 'agent_start') {
+      const agentName = (messageObj.agentName as string) || ''
+      if (agentName) {
+        const targetMessage = ensureToolState(aiMsgIndex)
+        if (targetMessage) {
+          targetMessage.currentAgent = agentName
+        }
+      }
+      return true
+    }
     if (type === 'workflow_event') {
       handleWorkflowEvent(messageObj, aiMsgIndex)
       return true

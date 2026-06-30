@@ -14,7 +14,7 @@ export interface ToolCallRecord {
   result?: string
   status: 'running' | 'completed' | 'failed'
   timestamp: number
-  agentName?: string // 发出此工具调用的 Agent 名称
+  agentName?: string
 }
 
 export interface PlanningOption {
@@ -53,5 +53,6 @@ export interface ChatMessage {
   toolCalls?: ToolCallRecord[]
   planning?: PlanningQuestionSet
   attachments?: AttachmentInfo[]
-  agentName?: string // 当前消息所属的 Agent 名称
+  agentName?: string
+  currentAgent?: string
 }
