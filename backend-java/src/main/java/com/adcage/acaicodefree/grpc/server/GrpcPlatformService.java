@@ -516,13 +516,23 @@ public class GrpcPlatformService extends PlatformServiceGrpc.PlatformServiceImpl
         if (fallbackConfig == null) {
             return null;
         }
-        String resolvedBaseUrl = pickBaseUrl(roleConfig.getBaseUrl(), fallbackConfig.getBaseUrl(), role);
+        // 判断角色配置是否提供了 apiKey：如果 apiKey 为空，说明该角色未独立配置凭据，
+        // 应整体 fallback 到 primary（baseUrl + apiKey + modelName 一起回退），
+        // 避免 baseUrl 和 apiKey 来自不同服务商导致认证失败
+        boolean hasOwnApiKey = StrUtil.isNotBlank(roleConfig.getApiKey());
+        String resolvedBaseUrl = hasOwnApiKey
+                ? pickBaseUrl(roleConfig.getBaseUrl(), fallbackConfig.getBaseUrl(), role)
+                : fallbackConfig.getBaseUrl();
+        String resolvedApiKey = firstNonBlank(roleConfig.getApiKey(), fallbackConfig.getApiKey());
+        String resolvedModelName = hasOwnApiKey
+                ? firstNonBlank(roleConfig.getModelName(), fallbackConfig.getModelName())
+                : fallbackConfig.getModelName();
         return buildRuntimeModelConfig(
                 role,
                 firstNonBlank(roleConfig.getProvider(), fallbackConfig.getProvider(), "openai"),
                 resolvedBaseUrl,
-                firstNonBlank(roleConfig.getApiKey(), fallbackConfig.getApiKey()),
-                firstNonBlank(roleConfig.getModelName(), fallbackConfig.getModelName()),
+                resolvedApiKey,
+                resolvedModelName,
                 hasConfiguredValue(roleConfig) ? "APP_AI_RUNTIME_MODELS" : fallbackConfig.getSource(),
                 fallbackConfig.getBillingMode()
         );
