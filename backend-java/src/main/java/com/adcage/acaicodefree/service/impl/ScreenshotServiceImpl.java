@@ -9,6 +9,7 @@ import com.adcage.acaicodefree.exception.BusinessException;
 import com.adcage.acaicodefree.mapper.AppMapper;
 import com.adcage.acaicodefree.model.entity.App;
 import com.adcage.acaicodefree.model.enums.CodeGenTypeEnum;
+import com.mybatisflex.core.update.UpdateChain;
 import com.adcage.acaicodefree.service.ScreenshotService;
 import com.adcage.acaicodefree.storage.FileStorageStrategy;
 import com.adcage.acaicodefree.utils.WebScreenshotUtils;
@@ -142,7 +143,10 @@ public class ScreenshotServiceImpl implements ScreenshotService {
                     App updateApp = new App();
                     updateApp.setId(appId);
                     updateApp.setCover(coverUrl);
-                    boolean updated = appMapper.update(updateApp) > 0;
+                    boolean updated = UpdateChain.of(App.class)
+                            .set(App::getCover, coverUrl)
+                            .where(App::getId).eq(appId)
+                            .update();
                     if (!updated) {
                         updateCoverTaskState(appId, "FAILED", attempt, "封面地址回写失败", agentRunId);
                         log.warn("封面地址回写失败, appId={}, coverUrl={}", appId, coverUrl);
