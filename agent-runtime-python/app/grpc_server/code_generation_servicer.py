@@ -90,7 +90,13 @@ def _detect_prompt_injection(prompt: str) -> str:
 
 class CodeGenerationServicer(code_generation_pb2_grpc.CodeGenerationServiceServicer):
     async def StreamGenerate(self, request, context):
-        logger.info("StreamGenerate | agentRunId=%s appId=%s", request.agent_run_id, request.app_id)
+        logger.info(
+            "StreamGenerate | agentRunId=%s appId=%s generation_mode=%s runtime_options_json=%s",
+            request.agent_run_id,
+            request.app_id,
+            request.generation_mode,
+            (request.runtime_options_json[:100] + "...") if len(request.runtime_options_json) > 100 else request.runtime_options_json,
+        )
         try:
             orchestrator = RuntimeOrchestrator()
             async for event in orchestrator.stream_generate(request):

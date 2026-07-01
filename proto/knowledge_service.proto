@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package protoflow.knowledge;
+
+option java_package = "com.adcage.acaicodefree.grpc.knowledge";
+
+// ============================================================
+// 知识库管理服务（Java → Python）
+// ============================================================
+
+service KnowledgeService {
+  // 查询所有文档库列表
+  rpc ListLibraries(ListLibrariesRequest) returns (ListLibrariesResponse);
+
+  // 语义检索知识库
+  rpc SearchKnowledge(SearchKnowledgeRequest) returns (SearchKnowledgeResponse);
+
+  // 触发重新索引（前端上传文档后调用）
+  rpc TriggerReindex(TriggerReindexRequest) returns (TriggerReindexResponse);
+
+  // 获取 RAG 系统状态
+  rpc GetRagStatus(GetRagStatusRequest) returns (GetRagStatusResponse);
+}
+
+// ============================================================
+// Messages
+// ============================================================
+
+message ListLibrariesRequest {}
+
+message ListLibrariesResponse {
+  bool success = 1;
+  string error_message = 2;
+  repeated LibraryInfo libraries = 3;
+}
+
+message LibraryInfo {
+  string slug = 1;
+  string display_name = 2;
+  string description = 3;
+  int32 doc_count = 4;
+  string indexed_at = 5;
+}
+
+message SearchKnowledgeRequest {
+  string query = 1;
+  optional string library = 2;  // 限定文档库，空则全库搜索
+  int32 top_k = 3;              // 返回数量，0 使用默认值
+}
+
+message SearchKnowledgeResponse {
+  bool success = 1;
+  string error_message = 2;
+  repeated SearchResult results = 3;
+}
+
+message SearchResult {
+  string content = 1;
+  string heading = 2;
+  string library_slug = 3;
+  double similarity = 4;
+  int64 doc_id = 5;
+}
+
+message TriggerReindexRequest {
+  bool full_reindex = 1;  // true = 全量重建，false = 仅触发增量扫描
+}
+
+message TriggerReindexResponse {
+  bool success = 1;
+  string error_message = 2;
+  int32 documents_indexed = 3;
+}
+
+message GetRagStatusRequest {}
+
+message GetRagStatusResponse {
+  bool enabled = 1;              // RAG 功能是否启用
+  bool embedding_configured = 2;  // Embedding 模型是否已配置
+  string embedding_model = 3;     // 当前 Embedding 模型名
+  int32 total_documents = 4;      // 文档总数
+  int32 total_chunks = 5;         // 片段总数
+  string last_indexed_at = 6;     // 最后索引时间
+  string error_message = 7;       // 错误信息（如 PG 连接失败）
+}

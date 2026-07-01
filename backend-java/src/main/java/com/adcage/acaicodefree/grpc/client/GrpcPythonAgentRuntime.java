@@ -184,6 +184,11 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
             builder.setGenerationMode(mapGenerationMode(request.getApp().getGenerationMode()));
         }
 
+        // runtime_options_json: Playground 模式传递工具勾选列表等运行时选项
+        if (request.getRuntimeOptionsJson() != null && !request.getRuntimeOptionsJson().isEmpty()) {
+            builder.setRuntimeOptionsJson(request.getRuntimeOptionsJson());
+        }
+
         // 映射附件列表
         if (request.getAttachments() != null && !request.getAttachments().isEmpty()) {
             for (var att : request.getAttachments()) {
@@ -224,6 +229,7 @@ public class GrpcPythonAgentRuntime implements CodeGenerationRuntime {
         if (mode == null || mode.isBlank()) return GenerationMode.APPLICATION;
         return switch (mode.toLowerCase()) {
             case "application" -> GenerationMode.APPLICATION;
+            case "test_playground" -> GenerationMode.TEST_PLAYGROUND;
             default -> GenerationMode.GENERATION_MODE_UNSPECIFIED;
         };
     }

@@ -18,3 +18,4 @@ class RuntimeServices:
     quality_checker: Any = None
     artifact_writer: Any = None
     generation_mode_registry: Any = None
+    rag_service: Any = None

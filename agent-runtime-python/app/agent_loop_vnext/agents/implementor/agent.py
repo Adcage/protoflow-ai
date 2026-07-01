@@ -26,6 +26,7 @@ class ImplementorAgent(Agent):
             file_tools,
             skill_registry=skill_registry,
             state=self._state,
+            rag_service=services.rag_service,
         )
 
     def build_system_prompt(
@@ -37,6 +38,8 @@ class ImplementorAgent(Agent):
         if services.asset_manager is not None:
             skill_registry = services.asset_manager.get_index().skill_registry
         builder = ImplementorPromptBuilder(
-            context, self._state, skill_registry=skill_registry,
+            context, self._state,
+            skill_registry=skill_registry,
+            rag_service=services.rag_service,
         )
         return builder.build_system_prompt()

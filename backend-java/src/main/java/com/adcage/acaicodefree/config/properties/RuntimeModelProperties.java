@@ -17,6 +17,9 @@ public class RuntimeModelProperties {
 
     private ModelConfig repair = new ModelConfig();
 
+    /** Embedding 模型配置，用于 RAG 技术文档库的向量化。不 fallback 到 primary。 */
+    private ModelConfig embedding = new ModelConfig();
+
     @Data
     public static class ModelConfig {
         private String provider = "";

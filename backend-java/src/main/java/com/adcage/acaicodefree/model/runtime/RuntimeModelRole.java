@@ -4,7 +4,8 @@ public enum RuntimeModelRole {
     LIGHT("light"),
     PRIMARY("primary"),
     CRITIC("critic"),
-    REPAIR("repair");
+    REPAIR("repair"),
+    EMBEDDING("embedding");
 
     private final String value;
 

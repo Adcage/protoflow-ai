@@ -10,6 +10,14 @@ export default {
   },
   children: [
     {
+      path: 'playground',
+      name: 'admin_playground',
+      component: () => import('@/pages/admin/PlaygroundPage.vue'),
+      meta: {
+        name: 'AI 工具测试',
+      },
+    },
+    {
       path: 'test-chat',
       name: 'admin_test_chat',
       component: () => import('@/pages/admin/TestChatPage.vue'),
@@ -40,6 +48,14 @@ export default {
       component: () => import('@/pages/admin/AppAdminPage.vue'),
       meta: {
         name: '应用管理',
+      },
+    },
+    {
+      path: 'knowledge',
+      name: 'admin_knowledge',
+      component: () => import('@/pages/admin/KnowledgeManagePage.vue'),
+      meta: {
+        name: '知识库管理',
       },
     },
   ],

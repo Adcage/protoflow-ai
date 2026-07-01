@@ -17,6 +17,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      '/api/v1/admin/knowledge': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api': {
         target: 'http://localhost:8700',
         changeOrigin: true,

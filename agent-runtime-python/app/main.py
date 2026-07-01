@@ -54,6 +54,10 @@ async def lifespan(app: FastAPI):
     audit_writer = get_llm_audit_writer()
     audit_writer.start()
 
+    # 启动时初始化 RAG 服务
+    from app.runtime.orchestrator import init_rag_service
+    await init_rag_service()
+
     logger.info(
         "application started | runtime=%s env=%s", settings.agent_runtime_name, settings.app_env
     )
@@ -61,6 +65,10 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("application shutting down...")
+
+    from app.runtime.orchestrator import close_rag_service
+    await close_rag_service()
+
     await audit_writer.stop()
     await grpc_server.stop(grace=5)
     logger.info("gRPC server stopped")
@@ -80,6 +88,13 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
 
     app.include_router(api_router)
+
+    # 知识库管理 API
+    try:
+        from app.api.knowledge_admin import router as knowledge_admin_router
+        app.include_router(knowledge_admin_router)
+    except ImportError as e:
+        logger.warning("知识库管理 API 注册失败: %s", e)
 
     @app.get("/health", tags=["health"])
     async def health(request: Request) -> dict:

@@ -6,3 +6,4 @@ class ModelRole(str, Enum):
     PRIMARY = "primary"
     CRITIC = "critic"
     REPAIR = "repair"
+    EMBEDDING = "embedding"

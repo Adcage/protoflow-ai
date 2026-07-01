@@ -1,8 +1,15 @@
 """代码实现 Agent 的提示词构建器。"""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from app.agent_loop_vnext.state import SingleImplementState
 from app.capabilities.skills.registry import SkillRegistry
 from app.runtime.context import ExecutionContext
+
+if TYPE_CHECKING:
+    from app.rag.service import RAGService
 
 _SINGLE_FILE_RULES = (
     "项目类型：single_file（单文件模式）\n"
@@ -67,10 +74,12 @@ class ImplementorPromptBuilder:
         context: ExecutionContext,
         state: SingleImplementState,
         skill_registry: SkillRegistry | None = None,
+        rag_service: RAGService | None = None,
     ) -> None:
         self._context = context
         self._state = state
         self._skill_registry = skill_registry
+        self._rag_service = rag_service
 
     def build_system_prompt(self) -> str:
         """构建系统提示词，由多个段落组合。"""
@@ -79,6 +88,7 @@ class ImplementorPromptBuilder:
             self._render_project_rules(),
             self._render_output_format(),
             self._render_skills(),
+            self._render_available_docs(),
         ]
         return "\n\n".join(p for p in parts if p)
 
@@ -141,6 +151,15 @@ class ImplementorPromptBuilder:
                     lines.append(f"**{skill_id}**: 无参考文件")
 
         return "\n".join(lines)
+
+    def _render_available_docs(self) -> str:
+        """渲染可查的技术文档库目录（RAG）。"""
+        if self._rag_service is None or not self._rag_service.enabled:
+            return ""
+
+        # 获取 library 列表（同步方式，从缓存读取）
+        # 注意：list_libraries 是 async，这里用 get_available_docs_description 作为同步替代
+        return self._rag_service.get_available_docs_description()
 
     def _get_effective_code_gen_type(self) -> str:
         code_gen_type = self._context.code_gen_type

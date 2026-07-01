@@ -15,6 +15,7 @@ enum CodeGenType {
 enum GenerationMode {
   GENERATION_MODE_UNSPECIFIED = 0;
   APPLICATION = 1;
+  TEST_PLAYGROUND = 2;
 }
 
 enum EventType {

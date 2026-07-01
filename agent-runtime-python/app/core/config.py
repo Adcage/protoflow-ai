@@ -37,5 +37,21 @@ class Settings(BaseSettings):
     llm_audit_enabled: bool = True
     llm_audit_dir: str = "../storage/llm_audit"
 
+    # PostgreSQL (pgvector) — RAG 技术文档库
+    pg_host: str = "localhost"
+    pg_port: int = 5432
+    pg_database: str = "protoflow_rag"
+    pg_user: str = "postgres"
+    pg_password: str = "123456"
+
+    # Knowledge 知识库目录
+    knowledge_dir: str = "../knowledge"
+
+    # RAG 参数
+    rag_chunk_max_size: int = 1500  # 超长章节二次切分阈值（字符数）
+    rag_chunk_overlap: int = 200  # 二次切分重叠字符数
+    rag_search_top_k: int = 5  # 检索返回数量
+    rag_search_similarity_threshold: float = 0.3  # 最低相似度
+
 
 settings = Settings()

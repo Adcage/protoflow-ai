@@ -21,6 +21,54 @@ from app.grpc_client.platform_client import GrpcPlatformClient
 
 logger = logging.getLogger("app.runtime.orchestrator")
 
+# 全局 RAG 服务单例（跨请求共享连接池，由 shutdown 时清理）
+_global_rag_service: object | None = None
+
+
+def _get_rag_service() -> object | None:
+    """获取全局 RAG 服务实例。"""
+    return _global_rag_service
+
+
+async def init_rag_service() -> None:
+    """启动时初始化 RAG 服务（连接 PG、解析 Embedding 配置、索引文档）。"""
+    global _global_rag_service
+    try:
+        from app.rag.service import RAGService
+        from app.modeling.resolver import ModelResolver
+        from app.grpc_client.platform_client import GrpcPlatformClient
+
+        rag = RAGService()
+        platform_client = GrpcPlatformClient()
+        model_resolver = ModelResolver(platform_client)
+
+        bundle = await platform_client.resolve_runtime_model_bundle(
+            user_id=0, app_id=0, agent_run_id=0, code_gen_type=0,
+        )
+        model_resolver._bundle = bundle
+        await rag.initialize(model_resolver)
+
+        _global_rag_service = rag
+        if rag.enabled:
+            logger.info("RAG 服务启动初始化成功")
+        else:
+            logger.info("RAG 服务已初始化但未启用（Embedding 模型未配置）")
+    except Exception as e:
+        logger.warning("RAG 服务启动初始化失败（不影响核心功能）: %s", e)
+        _global_rag_service = None
+
+
+async def close_rag_service() -> None:
+    """关闭全局 RAG 服务（应用 shutdown 时调用）。"""
+    global _global_rag_service
+    if _global_rag_service is not None:
+        try:
+            await _global_rag_service.close()  # type: ignore[union-attr]
+            logger.info("RAG 服务已关闭")
+        except Exception as e:
+            logger.warning("RAG 服务关闭异常: %s", e)
+        _global_rag_service = None
+
 
 def _parse_attachments_json(attachments_json: str | None) -> tuple[AttachmentInfo, ...]:
     """从 JSON 字符串解析附件元数据列表。"""
@@ -176,6 +224,7 @@ class RuntimeOrchestrator:
             quality_checker=self._quality_checker,
             artifact_writer=self._artifact_writer,
             generation_mode_registry=gen_mode_registry,
+            rag_service=_get_rag_service(),
         )
 
     async def _build_context(
@@ -249,7 +298,7 @@ class RuntimeOrchestrator:
             app=app,
             chat_history=chat_history,
             original_content=original_content,
-            runtime_options={},
+            runtime_options=self._parse_runtime_options(request),
             is_test=getattr(request, "is_test", False),
             is_resume=is_resume,
             generation_mode=generation_mode,
@@ -257,6 +306,14 @@ class RuntimeOrchestrator:
         )
 
     async def stream_generate(self, request):
+        # TEST_PLAYGROUND 模式优先路由（generation_mode == 2）
+        generation_mode = getattr(request, "generation_mode", None)
+        logger.info("stream_generate | generation_mode=%s type=%s", generation_mode, type(generation_mode))
+        if generation_mode == 2:  # protobuf enum: TEST_PLAYGROUND
+            async for event in self._run_playground(request, RunMode.GENERATE):
+                yield event
+            return
+
         engine = settings.agent_loop_engine
         if engine == "vnext":
             async for event in self._run_conductor_vnext(request, RunMode.GENERATE):
@@ -621,7 +678,174 @@ class RuntimeOrchestrator:
 
         await workflow_task
 
-    # 工具名归一化映射：event_bus 中记录的是 Python 类名（PascalCase），
+    # ── Playground 模式 ──────────────────────────────────────────────
+
+    def _parse_runtime_options(self, request) -> dict:
+        """从 gRPC 请求解析 runtime_options_json 为 dict。"""
+        raw = getattr(request, "runtime_options_json", "") or ""
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def _build_playground_services(self, event_bus: EventBus) -> RuntimeServices:
+        """构建 Playground 模式专用服务（精简 Prompt 模块，跳过生产约束）。"""
+        from app.prompts.registry import PromptModuleRegistry
+        from app.prompts.default_modules import (
+            RuntimeBoundaryModule,
+            SafetyAndInjectionResistanceModule,
+        )
+        from app.prompts.loop_modules import (
+            ToolListModule,
+            SkillContextModule,
+        )
+        from app.prompts.test_modules import TestModeInfoModule
+        from app.prompts.playground_modules import PlaygroundModeModule
+
+        registry = PromptModuleRegistry()
+        # Playground 模式启用的 Prompt 模块（精简版）
+        registry.register(RuntimeBoundaryModule())                # 运行时边界（必须）
+        registry.register(SafetyAndInjectionResistanceModule())   # 基本注入防护（必须）
+        registry.register(ToolListModule())                       # 工具列表（动态注入）
+        registry.register(SkillContextModule())                    # Skill 上下文
+        registry.register(TestModeInfoModule())                    # 测试模式（允许讨论内部机制）
+        registry.register(PlaygroundModeModule())                  # Playground 模式说明
+
+        # 注册 application 生成模式（保持兼容）
+        from app.generation_modes.application import register_application
+        from app.generation_modes.registry import GenerationModeRegistry
+        gen_mode_registry = GenerationModeRegistry()
+        register_application(gen_mode_registry)
+
+        return RuntimeServices(
+            platform_client=self._platform_client,
+            tool_client=None,
+            chat_model_factory=self._chat_model_factory,
+            model_policy=self._model_policy,
+            model_resolver=self._model_resolver,
+            prompt_composer=None,
+            prompt_module_registry=registry,
+            tool_registry=None,
+            event_bus=event_bus,
+            node_registry=None,
+            asset_manager=self._asset_manager,
+            quality_checker=self._quality_checker,
+            artifact_writer=self._artifact_writer,
+            generation_mode_registry=gen_mode_registry,
+            rag_service=_get_rag_service(),
+        )
+
+    async def _run_playground(self, request, run_mode: RunMode):
+        """Playground 模式：通过 LoopStrategy 构建链路组件 + SingleImplementLoopRunner 执行。"""
+        import dataclasses
+        from app.agent_loop_vnext.loops import get_loop_strategy
+        from app.agent_loop_vnext.runner import SingleImplementLoopRunner
+
+        agent_run_id = int(request.agent_run_id)
+        event_bus = EventBus(agent_run_id=agent_run_id)
+
+        # 通过策略模式获取链路构建器
+        strategy = get_loop_strategy(
+            request.generation_mode if hasattr(request, "generation_mode") else None,
+            runtime_orchestrator=self,
+            is_test=True,
+        )
+        services = strategy.build_services(event_bus)
+        start_time = time.monotonic()
+
+        context = await self._build_context(request, run_mode)
+        # 覆盖 runtime_options（从 request 解析 enabled_tools）
+        context = dataclasses.replace(
+            context,
+            runtime_options=self._parse_runtime_options(request),
+            is_test=True,  # Playground 始终测试模式
+        )
+
+        mapper = self._get_mapper()
+        if hasattr(mapper, "set_is_test"):
+            mapper.set_is_test(True)  # 不脱敏
+
+        async def _execute():
+            try:
+                runner = SingleImplementLoopRunner(context, services)
+                await runner.run()
+
+                latency_ms = int((time.monotonic() - start_time) * 1000)
+                loop_state_json = ""
+                success = runner.state.status == "completed"
+                ai_status = "success"
+                ai_extra = self._build_ai_extra_from_event_bus(event_bus)
+                if runner.state.status == "waiting_for_user":
+                    loop_state_json = '{"status":"waiting_for_user"}'
+                    ai_status = "waiting_for_user"
+
+                logger.info(
+                    "[Playground] complete_agent_run | agentRunId=%s success=%s ai_status=%s",
+                    agent_run_id, success, ai_status,
+                )
+
+                await self._platform_client.complete_agent_run(
+                    agent_run_id=agent_run_id,
+                    success=success,
+                    workspace_path=context.workspace_path,
+                    latency_ms=latency_ms,
+                    error_message="",
+                    loop_state_json=loop_state_json,
+                    ai_message=runner._accumulated_text,
+                    ai_status=ai_status,
+                    ai_extra=ai_extra,
+                )
+            except AgentRuntimeError as e:
+                logger.error("playground runner error | agentRunId=%s error=%s", agent_run_id, e)
+                await event_bus.emit(RuntimeEvent(
+                    RuntimeEventType.RUNTIME_ERROR,
+                    {"message": str(e), "code": int(e.code)},
+                ))
+                await event_bus.emit(RuntimeEvent(RuntimeEventType.DONE, {"message": f"失败: {e}"}))
+                try:
+                    await self._platform_client.complete_agent_run(
+                        agent_run_id=agent_run_id,
+                        success=False,
+                        error_message=str(e),
+                        latency_ms=int((time.monotonic() - start_time) * 1000),
+                        ai_status="failed",
+                    )
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error(
+                    "playground unexpected error | agentRunId=%s error=%s",
+                    agent_run_id, e, exc_info=True,
+                )
+                await event_bus.emit(RuntimeEvent(
+                    RuntimeEventType.RUNTIME_ERROR,
+                    {"message": str(e), "code": AgentErrorCode.INTERNAL_ERROR},
+                ))
+                await event_bus.emit(RuntimeEvent(RuntimeEventType.DONE, {"message": f"异常: {e}"}))
+                try:
+                    await self._platform_client.complete_agent_run(
+                        agent_run_id=agent_run_id,
+                        success=False,
+                        error_message=str(e),
+                        latency_ms=int((time.monotonic() - start_time) * 1000),
+                        ai_status="failed",
+                    )
+                except Exception:
+                    pass
+            finally:
+                await event_bus.close()
+
+        workflow_task = asyncio.create_task(_execute())
+
+        async for seq_event in self._drain_events(event_bus):
+            for proto_event in self._get_mapper().map_event(seq_event):
+                yield proto_event
+
+        await workflow_task
+
+    # ── 工具名归一化 ──────────────────────────────────────────────
     # 但 SSE 实时流和前端还原逻辑使用 snake_case（如 ask_user），
     # 存入 extra 时必须与前端保持一致，否则还原时匹配不上。
     _TOOL_NAME_NORMALIZE = {

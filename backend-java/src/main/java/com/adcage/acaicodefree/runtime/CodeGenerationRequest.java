@@ -24,4 +24,5 @@ public class CodeGenerationRequest {
     private String loopStateJson;
     private Boolean isTest;
     private List<ChatAttachmentInfo> attachments;
+    private String runtimeOptionsJson;
 }

@@ -217,7 +217,14 @@ const handleEnter = (e: KeyboardEvent) => {
   handleSend()
 }
 
-defineExpose({ inputText })
+defineExpose({
+  inputText,
+  clearInput: () => {
+    inputText.value = ''
+    attachedFiles.value = []
+    uploadedAttachments.value = []
+  },
+})
 </script>
 
 <style scoped>

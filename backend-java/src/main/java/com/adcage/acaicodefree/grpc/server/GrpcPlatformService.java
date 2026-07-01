@@ -507,7 +507,28 @@ public class GrpcPlatformService extends PlatformServiceGrpc.PlatformServiceImpl
             case PRIMARY -> primaryConfig;
             case CRITIC -> resolveRoleWithFallback(role, runtimeModelProperties.getCritic(), primaryConfig);
             case REPAIR -> resolveRoleWithFallback(role, runtimeModelProperties.getRepair(), primaryConfig);
+            // EMBEDDING 不 fallback 到 primary：embedding 和 chat 是不同类型的模型，不能降级
+            case EMBEDDING -> resolveEmbeddingRole(runtimeModelProperties.getEmbedding());
         };
+    }
+
+    /**
+     * 解析 EMBEDDING 角色配置。不 fallback 到 primary，因为 embedding 模型和 chat 模型是不同类型。
+     * 未配置时返回 null，Python 端会降级处理（RAG 功能不可用）。
+     */
+    private RuntimeModelConfig resolveEmbeddingRole(RuntimeModelProperties.ModelConfig embeddingConfig) {
+        if (!hasConfiguredValue(embeddingConfig)) {
+            return null;
+        }
+        return buildRuntimeModelConfig(
+                RuntimeModelRole.EMBEDDING,
+                firstNonBlank(embeddingConfig.getProvider(), "openai"),
+                embeddingConfig.getBaseUrl(),
+                embeddingConfig.getApiKey(),
+                embeddingConfig.getModelName(),
+                "APP_AI_RUNTIME_MODELS",
+                "SYSTEM_FREE_FALLBACK"
+        );
     }
 
     private RuntimeModelConfig resolveRoleWithFallback(RuntimeModelRole role,
@@ -517,16 +538,23 @@ public class GrpcPlatformService extends PlatformServiceGrpc.PlatformServiceImpl
             return null;
         }
         // 判断角色配置是否提供了 apiKey：如果 apiKey 为空，说明该角色未独立配置凭据，
-        // 应整体 fallback 到 primary（baseUrl + apiKey + modelName 一起回退），
-        // 避免 baseUrl 和 apiKey 来自不同服务商导致认证失败
+        // 应整体 fallback 到 primary（provider + baseUrl + apiKey + modelName + source 一起回退），
+        // 避免 provider 和 baseUrl/apiKey 来自不同服务商导致认证失败
         boolean hasOwnApiKey = StrUtil.isNotBlank(roleConfig.getApiKey());
-        String resolvedBaseUrl = hasOwnApiKey
-                ? pickBaseUrl(roleConfig.getBaseUrl(), fallbackConfig.getBaseUrl(), role)
-                : fallbackConfig.getBaseUrl();
-        String resolvedApiKey = firstNonBlank(roleConfig.getApiKey(), fallbackConfig.getApiKey());
-        String resolvedModelName = hasOwnApiKey
-                ? firstNonBlank(roleConfig.getModelName(), fallbackConfig.getModelName())
-                : fallbackConfig.getModelName();
+        if (!hasOwnApiKey) {
+            return buildRuntimeModelConfig(
+                    role,
+                    fallbackConfig.getProvider(),
+                    fallbackConfig.getBaseUrl(),
+                    fallbackConfig.getApiKey(),
+                    fallbackConfig.getModelName(),
+                    fallbackConfig.getSource(),
+                    fallbackConfig.getBillingMode()
+            );
+        }
+        String resolvedBaseUrl = pickBaseUrl(roleConfig.getBaseUrl(), fallbackConfig.getBaseUrl(), role);
+        String resolvedApiKey = roleConfig.getApiKey();
+        String resolvedModelName = firstNonBlank(roleConfig.getModelName(), fallbackConfig.getModelName());
         return buildRuntimeModelConfig(
                 role,
                 firstNonBlank(roleConfig.getProvider(), fallbackConfig.getProvider(), "openai"),

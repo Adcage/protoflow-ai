@@ -22,6 +22,9 @@ class ModelResolver:
         self._platform_client = platform_client
         self._bundle: dict[ModelRole, ResolvedModelConfig] = {}
 
+    # 不允许 fallback 的角色列表（embedding 和 chat 是不同类型的模型）
+    _NO_FALLBACK_ROLES: frozenset[ModelRole] = frozenset({ModelRole.EMBEDDING})
+
     async def load_bundle(self, context) -> None:
         if self._bundle:
             return
@@ -37,6 +40,9 @@ class ModelResolver:
     def resolve(self, role: ModelRole) -> ResolvedModelConfig:
         if role in self._bundle:
             return self._bundle[role]
+        # EMBEDDING 角色不允许 fallback：不能拿 chat 模型做 embedding
+        if role in self._NO_FALLBACK_ROLES:
+            raise RuntimeError(f"角色 {role.value} 未配置，且不允许 fallback")
         if ModelRole.PRIMARY in self._bundle:
             return self._bundle[ModelRole.PRIMARY]
         raise RuntimeError("No runtime model config resolved")
