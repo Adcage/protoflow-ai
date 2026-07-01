@@ -21,7 +21,7 @@ class FileWriteToolTest {
 
         String result = fileWriteTool.writeFile("src/App.vue", "你好，Vue 工程", 1L, "vue_project");
 
-        Path expectedFile = tempDir.resolve("vue_project_1").resolve("src/App.vue");
+        Path expectedFile = tempDir.resolve("vue_project1").resolve("src/App.vue");
         Assertions.assertTrue(Files.exists(expectedFile));
         Assertions.assertEquals("你好，Vue 工程", Files.readString(expectedFile, StandardCharsets.UTF_8));
         Assertions.assertEquals("文件写入成功：src/App.vue", result);
@@ -60,7 +60,7 @@ class FileWriteToolTest {
 
         String result = fileWriteTool.writeFile("index.html", "<html></html>", 1L, "single_file");
 
-        Path expectedFile = tempDir.resolve("single_file_1").resolve("index.html");
+        Path expectedFile = tempDir.resolve("single_file1").resolve("index.html");
         Assertions.assertTrue(Files.exists(expectedFile));
         Assertions.assertEquals("文件写入成功：index.html", result);
     }
@@ -71,7 +71,7 @@ class FileWriteToolTest {
 
         String result = fileWriteTool.writeFile("style.css", "body {}", 1L, "multi-file");
 
-        Path expectedFile = tempDir.resolve("multi-file_1").resolve("style.css");
+        Path expectedFile = tempDir.resolve("multi-file1").resolve("style.css");
         Assertions.assertTrue(Files.exists(expectedFile));
         Assertions.assertEquals("文件写入成功：style.css", result);
     }

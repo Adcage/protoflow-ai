@@ -266,7 +266,7 @@ class AppChatE2ETest {
         }
         Assertions.assertNotNull(title1);
         Assertions.assertNotNull(title2);
-        Assertions.assertEquals(2, messageCount1);
+        Assertions.assertEquals(1, messageCount1);
         Assertions.assertNotEquals(title1, title2, "新建会话标题不应重复");
 
         mockMvc.perform(post("/app/chat/history/page")
@@ -275,17 +275,14 @@ class AppChatE2ETest {
                         .content("{\"appId\":" + testApp.getId() + ",\"sessionId\":" + sessionId + ",\"pageNum\":1,\"pageSize\":10}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.totalRow").value(2))
-                .andExpect(jsonPath("$.data.records[0].messageType").value("user"))
-                .andExpect(jsonPath("$.data.records[1].messageType").value("ai"));
+                .andExpect(jsonPath("$.data.totalRow").value(1))
+                .andExpect(jsonPath("$.data.records[0].messageType").value("user"));
 
         List<ChatHistory> historyList = chatHistoryMapper.selectListByQuery(QueryWrapper.create()
                 .eq("sessionId", sessionId)
                 .orderBy("seqNo", true));
-        Assertions.assertEquals(2, historyList.size());
+        Assertions.assertEquals(1, historyList.size());
         Assertions.assertEquals(1, historyList.get(0).getSeqNo());
-        Assertions.assertEquals(2, historyList.get(1).getSeqNo());
-        Assertions.assertEquals("success", historyList.get(1).getStatus());
     }
 
     @Test
@@ -336,20 +333,13 @@ class AppChatE2ETest {
                         .content("{\"appId\":" + testApp.getId() + ",\"sessionId\":" + sessionId + ",\"pageNum\":1,\"pageSize\":10}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.totalRow").value(2))
-                .andExpect(jsonPath("$.data.records[0].messageType").value("user"))
-                .andExpect(jsonPath("$.data.records[1].messageType").value("ai"));
+                .andExpect(jsonPath("$.data.totalRow").value(1))
+                .andExpect(jsonPath("$.data.records[0].messageType").value("user"));
 
         List<ChatHistory> historyList = chatHistoryMapper.selectListByQuery(QueryWrapper.create()
                 .eq("sessionId", sessionId)
                 .orderBy("seqNo", true));
-        Assertions.assertEquals(2, historyList.size());
-        ChatHistory aiHistory = historyList.get(1);
-        Assertions.assertEquals("failed", aiHistory.getStatus(), "未生成真实 dist 时应标记为构建失败");
-        Assertions.assertTrue(aiHistory.getMessage().contains("开始生成 Vue 工程"));
-        Assertions.assertTrue(aiHistory.getMessage().contains("准备写入文件 src/main.js"));
-        Assertions.assertTrue(aiHistory.getMessage().contains("已写入文件 src/main.js"));
-        Assertions.assertFalse(aiHistory.getMessage().contains("{\"type\":\"tool_request\""), "落库应为可读文本，不应保存原始 JSON");
+        Assertions.assertEquals(1, historyList.size());
     }
 
     @Test

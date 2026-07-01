@@ -152,8 +152,9 @@ class TestAgentLoopStateSerialization:
 
         calls = data["workflow"]["executed_tool_calls"]
         arguments = calls[0]["arguments"]
-        assert "content" not in arguments
+        assert "content" in arguments
         assert arguments["content_length"] == 20_000
+        assert arguments["content_truncated"] is False
 
 
 class TestWorkflowStateV2FieldOwnership:

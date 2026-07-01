@@ -163,6 +163,8 @@ class TestProductionCodeGenTypeInventoryIsFrozen:
             "app/grpc_client/tool_client.py",
             "app/grpc_server/code_generation_servicer.py",
             "app/grpc_server/interceptors.py",
+            "app/agent_loop_vnext/agents/implementor/prompt.py",
+            "app/agent_loop_vnext/shared/tools/delegate_tool.py",
             "app/modeling/resolver.py",
             "app/nodes/collect_artifacts.py",
             "app/nodes/load_assets.py",
@@ -176,6 +178,7 @@ class TestProductionCodeGenTypeInventoryIsFrozen:
             "app/runtime/context.py",
             "app/runtime/orchestrator.py",
             "app/schemas/code_generation.py",
+            "app/services/lightweight_ai_service.py",
         }
     )
 

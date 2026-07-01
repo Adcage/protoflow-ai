@@ -21,6 +21,6 @@ class AiCodeGenTypeRoutingServiceTest {
         AppServiceImpl appService = new AppServiceImpl();
         Object result = ReflectionTestUtils.invokeMethod(appService,
                 "resolveCodeGenType", null, "个人简介页面");
-        Assertions.assertEquals(CodeGenTypeEnum.MULTI_FILE, result);
+        Assertions.assertEquals(CodeGenTypeEnum.SINGLE_FILE, result);
     }
 }

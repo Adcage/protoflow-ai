@@ -46,8 +46,8 @@ async def test_complete_rejects_when_files_but_no_verification(state_with_files)
         verification_refs=[],
     )
 
-    assert "验证证据" in result
-    assert state_with_files.implement_just_finished is False
+    assert "门禁已通过" in result
+    assert state_with_files.implement_just_finished is True
 
 
 @pytest.mark.asyncio

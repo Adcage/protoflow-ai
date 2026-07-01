@@ -18,7 +18,7 @@ class FileDeleteToolTest {
     @Test
     void deleteFileShouldDeleteNormalFile() throws Exception {
         FileDeleteTool fileDeleteTool = createTool();
-        Path targetFile = tempDir.resolve("vue_project_1").resolve("src/components/Hello.vue");
+        Path targetFile = tempDir.resolve("vue_project1").resolve("src/components/Hello.vue");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "<template>hello</template>", StandardCharsets.UTF_8);
 
@@ -31,7 +31,7 @@ class FileDeleteToolTest {
     @Test
     void deleteFileShouldBlockProtectedFile() throws Exception {
         FileDeleteTool fileDeleteTool = createTool();
-        Path targetFile = tempDir.resolve("vue_project_1").resolve("package.json");
+        Path targetFile = tempDir.resolve("vue_project1").resolve("package.json");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "{}", StandardCharsets.UTF_8);
 
@@ -42,7 +42,7 @@ class FileDeleteToolTest {
     @Test
     void deleteFileShouldWorkWithSingleFile() throws Exception {
         FileDeleteTool fileDeleteTool = createTool();
-        Path targetFile = tempDir.resolve("single_file_1").resolve("index.html");
+        Path targetFile = tempDir.resolve("single_file1").resolve("index.html");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "<html></html>", StandardCharsets.UTF_8);
 
@@ -55,7 +55,7 @@ class FileDeleteToolTest {
     @Test
     void deleteFileShouldWorkWithMultiFile() throws Exception {
         FileDeleteTool fileDeleteTool = createTool();
-        Path targetFile = tempDir.resolve("multi-file_1").resolve("script.js");
+        Path targetFile = tempDir.resolve("multi-file1").resolve("script.js");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "console.log('test')", StandardCharsets.UTF_8);
 

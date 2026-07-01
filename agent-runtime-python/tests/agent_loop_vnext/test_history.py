@@ -1,5 +1,6 @@
 """测试 HistoryBuilder 对话历史构建。"""
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agent_loop_vnext.shared.history import HistoryBuilder
@@ -17,20 +18,22 @@ def _make_context(prompt: str = "写一个登录页", history: list[ChatHistoryE
     )
 
 
-def test_build_messages_empty_history():
+@pytest.mark.asyncio
+async def test_build_messages_empty_history():
     """无历史记录时只返回 system + current user 两条消息。"""
     builder = HistoryBuilder()
     context = _make_context()
-    messages = builder.build_messages(context, "system prompt")
+    messages = await builder.build_messages(context, "system prompt")
 
     assert len(messages) == 2
     assert isinstance(messages[0], SystemMessage)
     assert messages[0].content == "system prompt"
     assert isinstance(messages[1], HumanMessage)
-    assert messages[1].content == "写一个登录页"
+    assert messages[1].content == [{"type": "text", "text": "写一个登录页"}]
 
 
-def test_build_messages_with_history():
+@pytest.mark.asyncio
+async def test_build_messages_with_history():
     """有历史记录时正确插入 history + current user。"""
     history = [
         ChatHistoryEntry(id=1, role="user", content="帮我写个首页"),
@@ -38,7 +41,7 @@ def test_build_messages_with_history():
     ]
     builder = HistoryBuilder()
     context = _make_context(history=history)
-    messages = builder.build_messages(context, "system prompt")
+    messages = await builder.build_messages(context, "system prompt")
 
     assert len(messages) == 4
     assert isinstance(messages[0], SystemMessage)
@@ -47,22 +50,23 @@ def test_build_messages_with_history():
     assert isinstance(messages[2], AIMessage)
     assert messages[2].content == "好的，我来写首页..."
     assert isinstance(messages[3], HumanMessage)
-    assert messages[3].content == "写一个登录页"
+    assert messages[3].content == [{"type": "text", "text": "写一个登录页"}]
 
 
-def test_history_before_current_dedup():
+@pytest.mark.asyncio
+async def test_history_before_current_dedup():
     """如果历史最后一条 user 消息和当前 prompt 重复，应去重。"""
     history = [
         ChatHistoryEntry(id=1, role="user", content="写一个登录页"),
     ]
     builder = HistoryBuilder()
     context = _make_context(history=history)
-    messages = builder.build_messages(context, "system prompt")
+    messages = await builder.build_messages(context, "system prompt")
 
     # 历史最后一条和当前 prompt 重复，应去重
     assert len(messages) == 2
     assert messages[0].content == "system prompt"
-    assert messages[1].content == "写一个登录页"
+    assert messages[1].content == [{"type": "text", "text": "写一个登录页"}]
 
 
 def test_history_before_current_no_dedup():
@@ -77,19 +81,23 @@ def test_history_before_current_no_dedup():
     assert len(result) == 2  # 不去重
 
 
-def test_message_from_role_user():
+@pytest.mark.asyncio
+async def test_message_from_role_user():
     """user 或 human role 转 HumanMessage。"""
     from app.agent_loop_vnext.shared.history import HistoryBuilder
-    msg1 = HistoryBuilder._message_from_role("user", "hello")
+    builder = HistoryBuilder()
+    msg1 = await builder._message_from_role("user", "hello")
     assert isinstance(msg1, HumanMessage)
-    msg2 = HistoryBuilder._message_from_role("human", "hello")
+    msg2 = await builder._message_from_role("human", "hello")
     assert isinstance(msg2, HumanMessage)
 
 
-def test_message_from_role_assistant():
+@pytest.mark.asyncio
+async def test_message_from_role_assistant():
     """assistant 或 ai role 转 AIMessage。"""
     from app.agent_loop_vnext.shared.history import HistoryBuilder
-    msg1 = HistoryBuilder._message_from_role("assistant", "hello")
+    builder = HistoryBuilder()
+    msg1 = await builder._message_from_role("assistant", "hello")
     assert isinstance(msg1, AIMessage)
-    msg2 = HistoryBuilder._message_from_role("ai", "hello")
+    msg2 = await builder._message_from_role("ai", "hello")
     assert isinstance(msg2, AIMessage)

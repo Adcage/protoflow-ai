@@ -8,6 +8,7 @@ import com.adcage.acaicodefree.grpc.codegen.CodeGenerationServiceGrpc;
 import com.adcage.acaicodefree.grpc.codegen.EnhancePromptRequest;
 import com.adcage.acaicodefree.grpc.codegen.EnhancePromptResponse;
 import com.adcage.acaicodefree.service.PythonPromptEnhanceService;
+import com.adcage.acaicodefree.utils.AiServiceErrorSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,12 +46,18 @@ public class PythonPromptEnhanceServiceImpl implements PythonPromptEnhanceServic
                 return response.getEnhancedPrompt();
             }
             String errorMessage = StrUtil.blankToDefault(response.getErrorMessage(), "Python 未返回有效提示词增强结果");
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, errorMessage);
+            throw new BusinessException(
+                    ErrorCode.OPERATION_ERROR,
+                    AiServiceErrorSanitizer.sanitizeLightweightError(errorMessage, "提示词优化服务暂时不可用")
+            );
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("gRPC enhancePrompt 调用失败, userId={}", userId, e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "提示词优化服务暂时不可用");
+            throw new BusinessException(
+                    ErrorCode.SYSTEM_ERROR,
+                    AiServiceErrorSanitizer.sanitizeLightweightError(e.getMessage(), "提示词优化服务暂时不可用")
+            );
         }
     }
 }

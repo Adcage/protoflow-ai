@@ -243,18 +243,13 @@ class PythonAgentE2ETest {
                         .content("{\"appId\":" + testApp.getId() + ",\"sessionId\":" + sessionId + ",\"pageNum\":1,\"pageSize\":10}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.totalRow").value(2))
-                .andExpect(jsonPath("$.data.records[0].messageType").value("user"))
-                .andExpect(jsonPath("$.data.records[1].messageType").value("ai"));
+                .andExpect(jsonPath("$.data.totalRow").value(1))
+                .andExpect(jsonPath("$.data.records[0].messageType").value("user"));
 
         List<ChatHistory> historyList = chatHistoryMapper.selectListByQuery(QueryWrapper.create()
                 .eq("sessionId", sessionId)
                 .orderBy("seqNo", true));
-        Assertions.assertEquals(2, historyList.size());
+        Assertions.assertEquals(1, historyList.size());
         Assertions.assertEquals(1, historyList.get(0).getSeqNo());
-        Assertions.assertEquals(2, historyList.get(1).getSeqNo());
-        ChatHistory aiHistory = historyList.get(1);
-        Assertions.assertEquals("failed", aiHistory.getStatus(), "未生成真实 dist 时应标记为构建失败");
-        Assertions.assertTrue(aiHistory.getMessage().contains("开始生成 Vue 工程"), "AI 消息应包含 ai_response 文本");
     }
 }

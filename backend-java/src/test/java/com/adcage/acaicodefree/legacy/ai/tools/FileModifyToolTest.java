@@ -17,7 +17,7 @@ class FileModifyToolTest {
     @Test
     void modifyFileShouldReplaceMatchedContent() throws Exception {
         FileModifyTool fileModifyTool = createTool();
-        Path targetFile = tempDir.resolve("vue_project_1").resolve("src/App.vue");
+        Path targetFile = tempDir.resolve("vue_project1").resolve("src/App.vue");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "<h1>旧标题</h1>", StandardCharsets.UTF_8);
 
@@ -30,7 +30,7 @@ class FileModifyToolTest {
     @Test
     void modifyFileShouldReturnFailureMessageWhenOldContentMissing() throws Exception {
         FileModifyTool fileModifyTool = createTool();
-        Path targetFile = tempDir.resolve("vue_project_1").resolve("src/App.vue");
+        Path targetFile = tempDir.resolve("vue_project1").resolve("src/App.vue");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "<h1>不匹配内容</h1>", StandardCharsets.UTF_8);
 
@@ -43,7 +43,7 @@ class FileModifyToolTest {
     @Test
     void modifySingleFileShouldWorkWithCodeGenType() throws Exception {
         FileModifyTool fileModifyTool = createTool();
-        Path targetFile = tempDir.resolve("single_file_1").resolve("index.html");
+        Path targetFile = tempDir.resolve("single_file1").resolve("index.html");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "<h1>旧标题</h1>", StandardCharsets.UTF_8);
 
@@ -56,7 +56,7 @@ class FileModifyToolTest {
     @Test
     void modifyMultiFileShouldWorkWithCodeGenType() throws Exception {
         FileModifyTool fileModifyTool = createTool();
-        Path targetFile = tempDir.resolve("multi-file_1").resolve("style.css");
+        Path targetFile = tempDir.resolve("multi-file1").resolve("style.css");
         Files.createDirectories(targetFile.getParent());
         Files.writeString(targetFile, "body { color: red; }", StandardCharsets.UTF_8);
 

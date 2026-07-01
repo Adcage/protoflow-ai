@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-protoflow-ai 是基于 Spring Boot 3.5.5 + Vue 3 + Python Agent Runtime 的 AI 编程辅助平台。三层架构通过 gRPC 互连：
+protoflow-ai 是基于 Spring Boot 3.5.5 + Vue 3 + Python Agent Runtime 的 AI 驱动的创意创作平台。三层架构通过 gRPC 互连：
 
 - **Java 后端**（端口 8700 HTTP / 9090 gRPC）：平台控制层 — 用户、应用、会话、模型配置、AgentRun、AppVersion、权限、限流、构建部署、文件工具、gRPC bridge
 - **Python Agent Runtime**（端口 8000 HTTP / 9091 gRPC）：所有 AI 核心能力 — 模型调用、Agent Loop、提示词增强、代码生成、工具调用决策、AI 路由

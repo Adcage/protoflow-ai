@@ -8,11 +8,18 @@
 
     <Transition name="slide" mode="out-in">
       <div v-if="showQuestions" :key="currentStep" class="planning-step">
-        <div class="question-label">
-          {{ currentQuestion.question }}
+        <div class="question-label-row">
+          <div
+            class="question-label markdown-content"
+            v-html="renderMarkdown(currentQuestion.question)"
+          ></div>
           <span v-if="currentQuestion.required" class="required-mark">*必填</span>
         </div>
-        <div v-if="currentQuestion.reason" class="question-reason">{{ currentQuestion.reason }}</div>
+        <div
+          v-if="currentQuestion.reason"
+          class="question-reason markdown-content"
+          v-html="renderMarkdown(currentQuestion.reason)"
+        ></div>
 
         <template v-if="currentQuestion.inputType === 'single_select'">
           <div
@@ -110,6 +117,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import MarkdownIt from 'markdown-it'
+import { normalizeLooseMarkdown } from '@/utils/chatMarkdown'
 
 export interface PlanningOption {
   value?: string
@@ -151,6 +160,19 @@ const isReadonly = computed(() => {
 })
 
 const currentQuestion = computed(() => props.questions[currentStep.value])
+
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+})
+
+const renderMarkdown = (text?: string): string => {
+  if (!text) return ''
+  return md
+    .render(normalizeLooseMarkdown(text))
+    .replace(/&lt;br\s*\/?&gt;/gi, '<br />')
+}
 
 const currentAnswer = computed({
   get: () => {
@@ -331,17 +353,26 @@ function goPrevReadonly() {
   padding: 18px;
 }
 
+.question-label-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .question-label {
+  flex: 1;
   font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 4px;
+  min-width: 0;
 }
 
 .required-mark {
   font-size: 11px;
   color: var(--color-error);
-  margin-left: 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .question-reason {
@@ -501,6 +532,32 @@ function goPrevReadonly() {
   color: var(--color-text-muted);
   min-width: 48px;
   text-align: center;
+}
+
+.markdown-content :deep(*:first-child) {
+  margin-top: 0;
+}
+
+.markdown-content :deep(*:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-content :deep(p) {
+  margin: 0 0 4px;
+}
+
+.markdown-content :deep(strong) {
+  font-weight: 700;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.markdown-content :deep(li) {
+  margin: 2px 0;
 }
 
 .slide-enter-active,

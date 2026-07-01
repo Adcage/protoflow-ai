@@ -310,7 +310,7 @@ class TestMultipleAskUser:
 
     @pytest.mark.asyncio
     async def test_second_ask_user_appends_question(self):
-        """第二次 ask_user 应追加问题而不是覆盖"""
+        """同一阶段第二次 ask_user 应被拒绝，避免重复提问。"""
         state = AgentLoopState()
         tool = AskUserTool()
         tool.set_state(state)
@@ -320,10 +320,10 @@ class TestMultipleAskUser:
         assert state.status == "waiting_for_user"
 
         state.status = "running"
-        await tool._arun(question="布局风格？", input_type="single_select", options=["侧边栏", "顶部导航"])
-        assert len(state.clarification_questions) == 2
+        result = await tool._arun(question="布局风格？", input_type="single_select", options=["侧边栏", "顶部导航"])
+        assert len(state.clarification_questions) == 1
+        assert "已经提问过" in result
         assert state.clarification_questions[0]["question"] == "配色方案？"
-        assert state.clarification_questions[1]["question"] == "布局风格？"
 
     def test_serialize_preserves_multiple_questions(self):
         """序列化应保留多个问题"""

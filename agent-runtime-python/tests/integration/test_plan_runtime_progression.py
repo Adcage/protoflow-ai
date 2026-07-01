@@ -435,10 +435,10 @@ def _new_project_plan_script() -> list[dict]:
 
 
 def _new_project_plan_script_without_ask_user() -> list[dict]:
-    """Plan script that skips ask_user to avoid pause.
+    """Plan script aligned with the current staged confirmation flow.
 
     Goes: submit_requirement_brief → record_project_inspection → choose_skill
-    → propose_design → confirm_design → write_implementation_plan
+    → propose_design → ask_user(confirm_design)
     """
     return [
         # Step 0: route_step (initial) → decide_route to plan
@@ -464,8 +464,8 @@ def _new_project_plan_script_without_ask_user() -> list[dict]:
                     "arguments": {
                         "application_direction": "登录界面",
                         "target_users": "网站用户",
-                        "primary_scenarios": ["用户登录", "密码找回"],
-                        "functional_scope": ["用户名密码登录", "记住我", "忘记密码链接"],
+                        "primary_scenarios": "用户登录\n密码找回",
+                        "functional_scope": "用户名密码登录\n记住我\n忘记密码链接",
                     },
                     "id": "plan-1",
                 }
@@ -532,51 +532,28 @@ def _new_project_plan_script_without_ask_user() -> list[dict]:
                 }
             ],
         },
-        # Step 5: plan_step - confirm design
+        # Step 5: plan_step - ask user to confirm design
         {
-            "text": "设计确认。",
+            "text": "先向用户展示设计方案并等待确认。",
             "tool_calls": [
                 {
-                    "name": "confirm_design",
+                    "name": "ask_user",
                     "arguments": {
-                        "message_id": "msg-user-ok",
+                        "stage": "confirm_design",
+                        "questions": [
+                            {
+                                "id": "design-confirm",
+                                "prompt": "以上登录页方案是否确认？",
+                                "inputType": "single_select",
+                                "options": [
+                                    {"id": "approved", "label": "没有需要调整"},
+                                    {"id": "needs_change", "label": "需要调整"},
+                                ],
+                                "required": True,
+                            }
+                        ],
                     },
                     "id": "plan-5",
-                }
-            ],
-        },
-        # Step 6: plan_step - write implementation plan
-        {
-            "text": "设计已确认，现在生成实施计划。",
-            "tool_calls": [
-                {
-                    "name": "write_implementation_plan",
-                    "arguments": {
-                        "tasks": [
-                            {
-                                "task_id": "T1",
-                                "goal": "创建登录页面组件",
-                                "allowed_files": ["src/views/Login.vue", "src/router/index.js"],
-                                "prohibited_files": [],
-                                "dependencies": [],
-                                "inputs": [],
-                                "outputs": ["Login.vue"],
-                                "test_requirements": [],
-                                "acceptance_criteria": ["登录页面可正常渲染"],
-                            }
-                        ],
-                        "test_plan": [
-                            {
-                                "test_id": "test-1",
-                                "description": "验证登录表单提交",
-                                "target": "Login.vue",
-                                "expected": "表单提交后触发登录逻辑",
-                            }
-                        ],
-                        "acceptance_criteria": ["登录页面功能完整"],
-                        "summary": "创建登录界面",
-                    },
-                    "id": "plan-6",
                 }
             ],
         },
@@ -584,7 +561,7 @@ def _new_project_plan_script_without_ask_user() -> list[dict]:
 
 
 class TestNewProjectPlanProgression:
-    """Test 1: Plan stages advance unidirectionally without Plan→Route loop."""
+    """Test 1: Plan stages advance to design confirmation without Plan→Route loop."""
 
     @pytest.mark.asyncio
     async def test_new_project_plan_progresses_without_plan_route_loop(self):
@@ -615,18 +592,18 @@ class TestNewProjectPlanProgression:
             assert envelope is not None, "Envelope should be initialized"
             plan_state: PlanStateV2 = envelope.workflow.plan
 
-            # Plan stages should have advanced unidirectionally
-            assert plan_state.plan_stage == "completed", (
-                f"Expected plan_stage='completed', got '{plan_state.plan_stage}'"
+            # Current flow should advance to confirm_design and wait for user input.
+            assert plan_state.plan_stage == "confirm_design", (
+                f"Expected plan_stage='confirm_design', got '{plan_state.plan_stage}'"
             )
 
             # Requirement brief should be recorded
             assert plan_state.requirement_brief is not None
             assert plan_state.requirement_brief.application_direction.value == "登录界面"
 
-            # Implementation plan should be written
-            assert plan_state.implementation_plan is not None
-            assert len(plan_state.implementation_plan.tasks) >= 1
+            # Design confirmation is now a pause point before implementation plan generation.
+            assert plan_state.implementation_plan is None
+            assert final.status == "waiting_for_user"
 
             # Route count before Plan completes = 0 (Route only fires before Plan starts and after)
             # The first route_step fires before Plan; it's the initial route
@@ -639,8 +616,7 @@ class TestNewProjectPlanProgression:
                 f"decide_route called {route_count} times, expected ≤ 1 (initial route only)"
             )
 
-            # Mode should have been switched to implement
-            assert final.mode == "implement", f"Expected mode='implement', got '{final.mode}'"
+            assert final.mode == "plan", f"Expected mode='plan', got '{final.mode}'"
 
 
 class TestProjectInspectionRecordedOnce:
@@ -739,7 +715,7 @@ class TestInternalPlanTextNotUserVisible:
 
 
 class TestPlanCompletionHandsOffToRouteOnce:
-    """Test 4: Plan completion triggers Route exactly once."""
+    """Test 4: 设计确认前不会额外触发 Route 或进入 Implement。"""
 
     @pytest.mark.asyncio
     async def test_plan_completion_hands_off_to_route_once(self):
@@ -766,22 +742,17 @@ class TestPlanCompletionHandsOffToRouteOnce:
             result = await graph.ainvoke(state)
             final = AgentLoopState.from_graph_result(result)
 
-            # After Plan completes, the fixed transition goes directly to implement
-            # without an intermediate route_step (route_iterations stays at 1)
             route_iterations = final.route_iterations
             assert route_iterations == 1, (
                 f"Expected route_iterations=1 (initial route only), got {route_iterations}"
             )
 
-            # plan_just_finished should have been cleared by apply_exit_transition
             assert not final.plan_just_finished, (
-                "plan_just_finished should be cleared after Plan→Implement transition"
+                "在用户确认设计前，不应标记 Plan 已完成"
             )
 
-            # Mode should be implement (set by apply_workflow_transition in PlanStepNode)
-            assert final.mode == "implement", (
-                f"Expected mode='implement', got '{final.mode}'"
-            )
+            assert final.mode == "plan", f"Expected mode='plan', got '{final.mode}'"
+            assert final.status == "waiting_for_user"
 
 
 class TestIterationCapCannotReportFalseSuccess:

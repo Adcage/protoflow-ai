@@ -33,6 +33,65 @@ export const looksLikeRiskRejection = (content: string) => {
   )
 }
 
+export const sanitizeAiServiceError = (
+  rawMessage?: string,
+  fallback = '提示词优化服务暂时不可用，请稍后重试',
+) => {
+  const message = (rawMessage || '').trim()
+  if (!message) return fallback
+  const normalized = message.replace(/^\[\d+\]\s*/, '')
+  const lowerMessage = normalized.toLowerCase()
+
+  if (normalized.includes('内容安全策略拦截')) {
+    return '提示词被内容安全策略拦截，请修改后重试'
+  }
+  if (
+    lowerMessage.includes('authentication fails') ||
+    lowerMessage.includes('authentication failed') ||
+    lowerMessage.includes('invalid api key') ||
+    lowerMessage.includes('incorrect api key') ||
+    lowerMessage.includes('unauthorized') ||
+    lowerMessage.includes('error code: 401')
+  ) {
+    return '轻量模型鉴权失败，请检查 AI_LIGHT_API_KEY、AI_LIGHT_BASE_URL 和 AI_LIGHT_MODEL 配置'
+  }
+  if (
+    lowerMessage.includes('quota') ||
+    lowerMessage.includes('insufficient_quota') ||
+    lowerMessage.includes('rate limit') ||
+    lowerMessage.includes('too many requests') ||
+    lowerMessage.includes('429')
+  ) {
+    return '轻量模型额度不足或请求过于频繁，请稍后重试'
+  }
+  if (
+    lowerMessage.includes('timeout') ||
+    lowerMessage.includes('timed out') ||
+    lowerMessage.includes('deadline exceeded') ||
+    lowerMessage.includes('read timeout')
+  ) {
+    return '轻量模型响应超时，请稍后重试'
+  }
+  if (
+    normalized.includes('没有可用的轻量模型配置') ||
+    normalized.includes('模型 API Key 不能为空') ||
+    normalized.includes('模型名称不能为空') ||
+    normalized.includes('不支持的模型提供商') ||
+    normalized.includes('系统模型配置未设置')
+  ) {
+    return '轻量模型配置不完整，请检查 AI_LIGHT_BASE_URL、AI_LIGHT_API_KEY、AI_LIGHT_MODEL 和 provider 配置'
+  }
+  if (
+    normalized.startsWith('提示词不能为空') ||
+    normalized.startsWith('初始化提示词不能为空') ||
+    normalized.startsWith('会话消息不能为空') ||
+    normalized.startsWith('轻量模型')
+  ) {
+    return normalized
+  }
+  return fallback
+}
+
 export const looksLikeGenerationFailure = (content: string) => {
   const lowerContent = content.toLowerCase()
   return (

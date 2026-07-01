@@ -287,6 +287,7 @@ import {
 } from '@lucide/vue'
 import { addApp, listGoodAppVoByPage, enhancePrompt } from '@/api/appController'
 import AppCard from '@/components/AppCard.vue'
+import { sanitizeAiServiceError } from '@/utils/appGenerator'
 
 const router = useRouter()
 const searchText = ref('')
@@ -393,10 +394,10 @@ const doEnhance = async () => {
         message.warning('AI 未返回有效的优化结果，请重试或直接发送')
       }
     } else {
-      message.error('优化失败，' + (res.data?.message ?? '未知错误'))
+      message.error('优化失败，' + sanitizeAiServiceError(res.data?.message))
     }
   } catch (e: unknown) {
-    message.error('优化失败，' + (e instanceof Error ? e.message : String(e)))
+    message.error('优化失败，' + sanitizeAiServiceError(e instanceof Error ? e.message : String(e)))
   } finally {
     enhancing.value = false
   }

@@ -20,8 +20,9 @@ class VueProjectBuildServiceTest {
         List<List<String>> commands = new ArrayList<>();
         TestBuildService buildService = new TestBuildService(tempDir, commands);
         Long appId = 1L;
-        Path projectDir = tempDir.resolve("vue_project_" + appId);
+        Path projectDir = tempDir.resolve("vue_project").resolve(String.valueOf(appId));
         Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("package.json"), "{\"name\":\"demo\"}");
 
         buildService.buildVueProject(appId);
 
@@ -48,7 +49,9 @@ class VueProjectBuildServiceTest {
             }
         };
         Long appId = 2L;
-        Files.createDirectories(tempDir.resolve("vue_project_" + appId));
+        Path projectDir = tempDir.resolve("vue_project").resolve(String.valueOf(appId));
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("package.json"), "{\"name\":\"demo\"}");
 
         Assertions.assertThrows(RuntimeException.class, () -> buildService.buildVueProject(appId));
     }
@@ -56,7 +59,7 @@ class VueProjectBuildServiceTest {
     @Test
     void shouldRepairInvalidPackageVersionAndRetryInstall() throws Exception {
         Long appId = 3L;
-        Path projectDir = tempDir.resolve("vue_project_" + appId);
+        Path projectDir = tempDir.resolve("vue_project").resolve(String.valueOf(appId));
         Files.createDirectories(projectDir);
         Files.writeString(projectDir.resolve("package.json"), """
                 {
@@ -108,7 +111,7 @@ class VueProjectBuildServiceTest {
     @Test
     void shouldFallbackToUpdateVueWhenCompilerDomMissingIsTransitive() throws Exception {
         Long appId = 4L;
-        Path projectDir = tempDir.resolve("vue_project_" + appId);
+        Path projectDir = tempDir.resolve("vue_project").resolve(String.valueOf(appId));
         Files.createDirectories(projectDir);
         Files.writeString(projectDir.resolve("package.json"), """
                 {

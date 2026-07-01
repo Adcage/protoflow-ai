@@ -5,6 +5,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.core.error_codes import AgentErrorCode
 from app.core.exceptions import AgentRuntimeError
+from app.core.model_error_sanitizer import summarize_error_for_log, to_safe_agent_error
 from app.services.chat_model_factory import ChatModelFactory
 
 logger = logging.getLogger("app.services.title_generator")
@@ -101,10 +102,11 @@ class TitleGeneratorService:
             if not title:
                 raise AgentRuntimeError("标题生成结果为空", code=AgentErrorCode.MODEL_RESPONSE_EMPTY)
             return title
-        except AgentRuntimeError:
-            raise
+        except AgentRuntimeError as e:
+            raise to_safe_agent_error(e, default_message="轻量标题生成服务暂时不可用") from e
         except Exception as e:
-            logger.error("title generation failed: %s", e)
-            raise AgentRuntimeError(
-                f"标题生成失败: {e}", code=AgentErrorCode.MODEL_CALL_FAILED
-            ) from e
+            logger.error(
+                "title generation failed: %s",
+                summarize_error_for_log(e, default_message="轻量标题生成服务暂时不可用"),
+            )
+            raise to_safe_agent_error(e, default_message="轻量标题生成服务暂时不可用") from e

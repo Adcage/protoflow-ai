@@ -9,6 +9,7 @@ import com.adcage.acaicodefree.grpc.codegen.GenerateAppTitleRequest;
 import com.adcage.acaicodefree.grpc.codegen.GenerateSessionTitleRequest;
 import com.adcage.acaicodefree.grpc.codegen.GenerateTitleResponse;
 import com.adcage.acaicodefree.service.PythonTitleGenerationService;
+import com.adcage.acaicodefree.utils.AiServiceErrorSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -79,12 +80,18 @@ public class PythonTitleGenerationServiceImpl implements PythonTitleGenerationSe
                 return response.getTitle();
             }
             String errorMessage = StrUtil.blankToDefault(response.getErrorMessage(), "Python 未返回有效标题");
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, errorMessage);
+            throw new BusinessException(
+                    ErrorCode.OPERATION_ERROR,
+                    AiServiceErrorSanitizer.sanitizeLightweightError(errorMessage, "轻量标题生成服务暂时不可用")
+            );
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("gRPC {} 调用失败, userId={}", action, userId, e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "轻量标题生成服务暂时不可用");
+            throw new BusinessException(
+                    ErrorCode.SYSTEM_ERROR,
+                    AiServiceErrorSanitizer.sanitizeLightweightError(e.getMessage(), "轻量标题生成服务暂时不可用")
+            );
         }
     }
 

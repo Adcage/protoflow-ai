@@ -99,7 +99,7 @@ import { useChatSession } from '@/composables/useChatSession'
 import {
   formatCodeGenType, formatCoverTaskStatus, coverTaskStatusColor,
   looksLikeRiskRejection, buildSelectedElementPrompt,
-  extractLatestFailureReason, isTimeoutFailureReason,
+  extractLatestFailureReason, isTimeoutFailureReason, sanitizeAiServiceError,
 } from '@/utils/appGenerator'
 import ChatSessionPanel, { type SessionItem } from '@/components/ChatSessionPanel.vue'
 import ChatMessageList from '@/components/ChatMessageList.vue'
@@ -268,7 +268,14 @@ async function handlePlanningSubmit(answers: Record<string, string>) {
   const sessionId = currentSessionId.value
   if (!sessionId) return
   // 不生成用户消息气泡，将答案注入 AI 消息的 planning.answers
-  const aiMsg = messages.value.findLast(m => m.role === 'ai' && m.planning)
+  let aiMsg = undefined as typeof messages.value[number] | undefined
+  for (let i = messages.value.length - 1; i >= 0; i -= 1) {
+    const candidate = messages.value[i]
+    if (candidate.role === 'ai' && candidate.planning) {
+      aiMsg = candidate
+      break
+    }
+  }
   if (aiMsg) aiMsg.planning!.answers = resumeAnswers
   previewWarning.value = ''
   previewStatus.value = 'generating'
@@ -310,8 +317,8 @@ const doEnhanceInput = async (promptText: string) => {
       } else if (enhanced && looksLikeRiskRejection(enhanced)) {
         message.error('提示词被内容安全策略拦截，请修改后重试')
       } else { message.warning('AI 未返回有效的优化结果，请重试或直接发送') }
-    } else { message.error('优化失败，' + (res.data?.message ?? '未知错误')) }
-  } catch (e: unknown) { message.error('优化失败，' + (e instanceof Error ? e.message : String(e))) }
+    } else { message.error('优化失败，' + sanitizeAiServiceError(res.data?.message)) }
+  } catch (e: unknown) { message.error('优化失败，' + sanitizeAiServiceError(e instanceof Error ? e.message : String(e))) }
   finally { enhancingInput.value = false }
 }
 

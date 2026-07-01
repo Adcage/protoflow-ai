@@ -5,6 +5,7 @@ import { extractBusinessChunk, splitConcatenatedJsonObjects } from './sseParser'
 import { buildChatStreamRequestBody, type AttachmentInfo } from '@/utils/chatStreamRequest'
 import type { ChatMessage, PlanningQuestion, PlanningQuestionSet, ToolCallRecord } from '@/types/chat'
 import { formatToolCallDescription } from '@/utils/chatMessageTooling'
+import { isStreamControlMessage } from '@/utils/streamControlMessage'
 
 export interface SSEChatOptions {
   appId: string | Ref<string>
@@ -305,7 +306,7 @@ export function useSSEChat(options: SSEChatOptions) {
           // ai_response → 追加到消息文本
           if (messageObj.type === 'ai_response' && typeof messageObj.data === 'string') {
             const data = messageObj.data
-            if (data && data !== 'waiting_for_user' && messages.value[aiMsgIndex]) {
+            if (data && !isStreamControlMessage(data) && messages.value[aiMsgIndex]) {
               messages.value[aiMsgIndex].content += data
             }
             return true
@@ -363,7 +364,7 @@ export function useSSEChat(options: SSEChatOptions) {
     if (type === 'ai_response') {
       const data = (messageObj.data as string) || ''
       const agentName = (messageObj.agentName as string) || ''
-      if (data !== 'waiting_for_user') {
+      if (!isStreamControlMessage(data)) {
         messages.value[aiMsgIndex].content += data
       }
       if (agentName && messages.value[aiMsgIndex]) {

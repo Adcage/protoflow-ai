@@ -126,10 +126,8 @@ const handleLogout = () => {
 .header-content {
   display: flex;
   align-items: center;
-  padding: 0 var(--space-lg);
+  padding: 0 var(--space-page-x);
   height: 64px;
-  max-width: 1400px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -282,7 +280,7 @@ const handleLogout = () => {
 .mobile-nav {
   display: none;
   flex-direction: column;
-  padding: var(--space-sm) var(--space-lg);
+  padding: var(--space-sm) var(--space-page-x);
   background: rgba(28, 45, 61, 0.96);
   border-bottom: 1px solid var(--color-border-dark);
 }
@@ -306,6 +304,10 @@ const handleLogout = () => {
 }
 
 @media (max-width: 768px) {
+  .header-content {
+    padding: 0 var(--space-page-x-sm);
+  }
+
   .header-nav {
     display: none;
   }
@@ -325,6 +327,7 @@ const handleLogout = () => {
 
   .mobile-nav {
     display: flex;
+    padding-inline: var(--space-page-x-sm);
   }
 
   .site-title {

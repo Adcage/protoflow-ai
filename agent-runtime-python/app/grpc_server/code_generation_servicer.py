@@ -1,6 +1,7 @@
 import logging
 
 from app.core.error_codes import AgentErrorCode
+from app.core.model_error_sanitizer import summarize_error_for_log, to_safe_agent_error
 from app.grpc import code_generation_pb2
 from app.grpc import code_generation_pb2_grpc
 from app.grpc import common_pb2
@@ -168,8 +169,15 @@ class CodeGenerationServicer(code_generation_pb2_grpc.CodeGenerationServiceServi
             )
             return code_generation_pb2.EnhancePromptResponse(success=True, enhanced_prompt=enhanced)
         except Exception as e:
-            logger.error("EnhancePrompt failed: %s", e, exc_info=True)
-            return code_generation_pb2.EnhancePromptResponse(success=False, error_message=str(e))
+            safe_error = to_safe_agent_error(e, default_message="提示词优化服务暂时不可用")
+            logger.error(
+                "EnhancePrompt failed: %s",
+                summarize_error_for_log(e, default_message="提示词优化服务暂时不可用"),
+            )
+            return code_generation_pb2.EnhancePromptResponse(
+                success=False,
+                error_message=str(safe_error),
+            )
 
     async def GenerateAppTitle(self, request, context):
         init_prompt = request.init_prompt
@@ -185,8 +193,15 @@ class CodeGenerationServicer(code_generation_pb2_grpc.CodeGenerationServiceServi
             title = await lightweight_service.generate_app_title(init_prompt)
             return code_generation_pb2.GenerateTitleResponse(success=True, title=title)
         except Exception as e:
-            logger.error("GenerateAppTitle failed: %s", e, exc_info=True)
-            return code_generation_pb2.GenerateTitleResponse(success=False, error_message=str(e))
+            safe_error = to_safe_agent_error(e, default_message="轻量标题生成服务暂时不可用")
+            logger.error(
+                "GenerateAppTitle failed: %s",
+                summarize_error_for_log(e, default_message="轻量标题生成服务暂时不可用"),
+            )
+            return code_generation_pb2.GenerateTitleResponse(
+                success=False,
+                error_message=str(safe_error),
+            )
 
     async def GenerateSessionTitle(self, request, context):
         first_user_message = request.first_user_message
@@ -207,5 +222,12 @@ class CodeGenerationServicer(code_generation_pb2_grpc.CodeGenerationServiceServi
             )
             return code_generation_pb2.GenerateTitleResponse(success=True, title=title)
         except Exception as e:
-            logger.error("GenerateSessionTitle failed: %s", e, exc_info=True)
-            return code_generation_pb2.GenerateTitleResponse(success=False, error_message=str(e))
+            safe_error = to_safe_agent_error(e, default_message="轻量标题生成服务暂时不可用")
+            logger.error(
+                "GenerateSessionTitle failed: %s",
+                summarize_error_for_log(e, default_message="轻量标题生成服务暂时不可用"),
+            )
+            return code_generation_pb2.GenerateTitleResponse(
+                success=False,
+                error_message=str(safe_error),
+            )

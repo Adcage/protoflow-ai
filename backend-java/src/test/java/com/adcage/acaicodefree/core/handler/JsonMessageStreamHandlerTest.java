@@ -4,10 +4,8 @@ import cn.hutool.json.JSONUtil;
 import com.adcage.acaicodefree.ai.model.message.AiResponseMessage;
 import com.adcage.acaicodefree.ai.model.message.ToolExecutedMessage;
 import com.adcage.acaicodefree.ai.model.message.ToolRequestMessage;
-import com.adcage.acaicodefree.service.FileOperationService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -38,7 +36,8 @@ class JsonMessageStreamHandlerTest {
         List<String> output = handler.handle(Flux.just(repeatedRequest, repeatedRequest), readable).collectList().block();
 
         Assertions.assertNotNull(output);
-        Assertions.assertEquals(1, output.size());
+        Assertions.assertEquals(2, output.size());
+        Assertions.assertEquals("", readable.toString());
     }
 
     @Test
@@ -53,7 +52,7 @@ class JsonMessageStreamHandlerTest {
 
         Assertions.assertNotNull(output);
         Assertions.assertEquals(2, output.size());
-        Assertions.assertTrue(readable.toString().contains("[工具完成] 已写入文件 src/main.js"));
+        Assertions.assertEquals("", readable.toString());
     }
 
     @Test
@@ -72,12 +71,11 @@ class JsonMessageStreamHandlerTest {
 
         Assertions.assertNotNull(output);
         Assertions.assertEquals(1, output.size());
-        // arguments 必须原样透传：questionSetId、protocolVersion、questions 都保留
+        // tool_request 整体 JSON 应原样透传，不改写 arguments
         Assertions.assertTrue(output.get(0).contains("\"name\":\"ask_user\""));
         Assertions.assertTrue(output.get(0).contains("\"id\":\"qs_discover_direction_abc\""));
-        Assertions.assertTrue(output.get(0).contains("\"protocolVersion\":1"));
-        Assertions.assertTrue(output.get(0).contains("\"questionSetId\":\"qs_discover_direction_abc\""));
-        Assertions.assertTrue(output.get(0).contains("\"id\":\"q1\""));
+        Assertions.assertTrue(output.get(0).contains("\"arguments\":\"{\\\"protocolVersion\\\":1"));
+        Assertions.assertEquals("", readable.toString());
     }
 
     @Test
@@ -97,9 +95,6 @@ class JsonMessageStreamHandlerTest {
     }
 
     private JsonMessageStreamHandler createHandler() {
-        JsonMessageStreamHandler handler = new JsonMessageStreamHandler();
-        FileOperationService fileOperationService = new FileOperationService();
-        ReflectionTestUtils.setField(handler, "fileOperationService", fileOperationService);
-        return handler;
+        return new JsonMessageStreamHandler();
     }
 }

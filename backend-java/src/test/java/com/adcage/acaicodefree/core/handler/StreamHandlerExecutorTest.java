@@ -35,15 +35,18 @@ class StreamHandlerExecutorTest {
         StreamHandlerExecutor executor = createExecutor();
         StringBuilder readable = new StringBuilder();
 
-        executor.handle(CodeGenTypeEnum.MULTI_FILE, Flux.just(
+        var chunks = executor.handle(CodeGenTypeEnum.MULTI_FILE, Flux.just(
                         "{\"id\":\"t1\",\"name\":\"writeFile\",\"arguments\":\"{\\\"relativeFilePath\\\":\\\"index.html\\\"}\",\"type\":\"tool_request\"}",
                         "{\"id\":\"t1\",\"name\":\"writeFile\",\"arguments\":\"{\\\"relativeFilePath\\\":\\\"index.html\\\"}\",\"result\":\"文件写入成功：index.html\",\"type\":\"tool_executed\"}"
                 ), readable)
                 .collectList()
                 .block();
 
-        Assertions.assertTrue(readable.toString().contains("[工具完成]"));
-        Assertions.assertFalse(readable.toString().contains("\"type\":\"tool_executed\""));
+        Assertions.assertNotNull(chunks);
+        Assertions.assertEquals(2, chunks.size());
+        Assertions.assertEquals("", readable.toString());
+        Assertions.assertTrue(chunks.get(0).contains("\"type\":\"tool_request\""));
+        Assertions.assertTrue(chunks.get(1).contains("\"type\":\"tool_executed\""));
     }
 
     @Test
@@ -51,15 +54,18 @@ class StreamHandlerExecutorTest {
         StreamHandlerExecutor executor = createExecutor();
         StringBuilder readable = new StringBuilder();
 
-        executor.handle(CodeGenTypeEnum.SINGLE_FILE, Flux.just(
+        var chunks = executor.handle(CodeGenTypeEnum.SINGLE_FILE, Flux.just(
                         "{\"id\":\"t1\",\"name\":\"writeFile\",\"arguments\":\"{\\\"relativeFilePath\\\":\\\"index.html\\\"}\",\"type\":\"tool_request\"}",
                         "{\"id\":\"t1\",\"name\":\"writeFile\",\"arguments\":\"{\\\"relativeFilePath\\\":\\\"index.html\\\"}\",\"result\":\"文件写入成功：index.html\",\"type\":\"tool_executed\"}"
                 ), readable)
                 .collectList()
                 .block();
 
-        Assertions.assertTrue(readable.toString().contains("[工具完成]"));
-        Assertions.assertFalse(readable.toString().contains("\"type\":\"tool_executed\""));
+        Assertions.assertNotNull(chunks);
+        Assertions.assertEquals(2, chunks.size());
+        Assertions.assertEquals("", readable.toString());
+        Assertions.assertTrue(chunks.get(0).contains("\"type\":\"tool_request\""));
+        Assertions.assertTrue(chunks.get(1).contains("\"type\":\"tool_executed\""));
     }
 
     private StreamHandlerExecutor createExecutor() {

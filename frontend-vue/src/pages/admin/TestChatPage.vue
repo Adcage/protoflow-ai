@@ -85,6 +85,7 @@
           @clear-selected-element="() => {}"
         />
         <ChatInputArea
+          ref="chatInputAreaRef"
           :generating="generating"
           :placeholder="'输入测试指令，按 Enter 发送...'"
           @send="doChatWithMessage"
@@ -148,6 +149,7 @@ import ImagePreviewer from '@/components/ImagePreviewer.vue'
 import type { AttachmentInfo } from '@/utils/chatStreamRequest'
 import type { ChatMessage } from '@/types/chat'
 import { buildMessageToolSummary, normalizeToolEvents, parsePlanningFromExtra, parseToolCallsFromHistory } from '@/utils/chatMessageTooling'
+import { looksLikeRiskRejection, sanitizeAiServiceError } from '@/utils/appGenerator'
 
 const router = useRouter()
 const route = useRoute()
@@ -183,6 +185,7 @@ const resizeStartWidth = ref(450)
 
 // 组件引用
 const chatMessageListRef = ref<InstanceType<typeof ChatMessageList>>()
+const chatInputAreaRef = ref<InstanceType<typeof ChatInputArea>>()
 const previewPanelRef = ref<InstanceType<typeof PreviewPanel>>()
 
 // SSE composable + 预览
@@ -563,16 +566,25 @@ const handleReloadCurrentSession = async () => {
 const doEnhanceInput = async (promptText: string) => {
   const prompt = promptText.trim()
   if (!prompt) return
+  if (looksLikeRiskRejection(prompt)) {
+    message.error('当前输入包含安全拦截信息，请重新输入需求描述')
+    return
+  }
   try {
     const res = await enhancePrompt({ prompt })
     if (res.data?.code === 0) {
       const enhanced = res.data?.data
-      if (enhanced && enhanced.trim()) {
+      if (enhanced && enhanced.trim() && !looksLikeRiskRejection(enhanced)) {
+        if (chatInputAreaRef.value) chatInputAreaRef.value.inputText = enhanced
         message.success('提示词优化完成，请查看输入框')
+      } else if (enhanced && looksLikeRiskRejection(enhanced)) {
+        message.error('提示词被内容安全策略拦截，请修改后重试')
       }
+    } else {
+      message.error('优化失败，' + sanitizeAiServiceError(res.data?.message))
     }
-  } catch {
-    message.error('优化失败')
+  } catch (e: unknown) {
+    message.error('优化失败，' + sanitizeAiServiceError(e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -616,7 +628,14 @@ async function handlePlanningSubmit(answers: Record<string, string>) {
   const sessionId = currentSessionId.value
   if (!sessionId) return
   // 不生成用户消息气泡，将答案注入 AI 消息的 planning.answers
-  const aiMsg = messages.value.findLast(m => m.role === 'ai' && m.planning)
+  let aiMsg = undefined as typeof messages.value[number] | undefined
+  for (let i = messages.value.length - 1; i >= 0; i -= 1) {
+    const candidate = messages.value[i]
+    if (candidate.role === 'ai' && candidate.planning) {
+      aiMsg = candidate
+      break
+    }
+  }
   if (aiMsg) aiMsg.planning!.answers = resumeAnswers
   previewWarning.value = ''
   previewStatus.value = 'generating'

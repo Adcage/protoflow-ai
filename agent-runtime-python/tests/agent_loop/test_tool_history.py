@@ -103,7 +103,7 @@ def test_tool_history_prefers_latest_records_when_over_budget():
             id=str(index),
             name="run_command",
             arguments={"command": f"cmd-{index}"},
-            result="x" * 1_500,
+            result=f"result-{index}-" + "x" * 1_500,
         )
         for index in range(5)
     ]
@@ -115,4 +115,5 @@ def test_tool_history_prefers_latest_records_when_over_budget():
     )
 
     assert message is not None
-    assert "cmd-4" in message.content
+    assert "result-4-" in message.content
+    assert "result-0-" not in message.content
