@@ -23,6 +23,10 @@
         class="admin-menu"
         @click="handleMenuClick"
       >
+        <a-menu-item key="/admin/playground">
+          <template #icon><FlaskConical :size="18" /></template>
+          <span>AI 工具测试</span>
+        </a-menu-item>
         <a-menu-item key="/admin/test-chat">
           <template #icon><MessageSquare :size="18" /></template>
           <span>AI 测试对话</span>
@@ -90,7 +94,7 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute, RouterView } from 'vue-router'
 import { useLoginUserStore } from '@/stores/LoginUser.ts'
-import { MessageSquare, Users, LayoutGrid, BookOpen, Home, User, LogOut } from '@lucide/vue'
+import { MessageSquare, Users, LayoutGrid, BookOpen, Home, User, LogOut, FlaskConical } from '@lucide/vue'
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 
@@ -102,6 +106,7 @@ loginUserStore.fetchLoginUser()
 const collapsed = ref(false)
 
 const menuItems = [
+  { key: '/admin/playground', label: 'AI 工具测试' },
   { key: '/admin/test-chat', label: 'AI 测试对话' },
   { key: '/admin/userManage', label: '用户管理' },
   { key: '/admin/appManage', label: '应用管理' },
@@ -110,6 +115,7 @@ const menuItems = [
 
 const selectedKeys = computed(() => {
   const path = route.path
+  if (path.startsWith('/admin/playground')) return ['/admin/playground']
   if (path.startsWith('/admin/test-chat')) return ['/admin/test-chat']
   if (path.startsWith('/admin/knowledge')) return ['/admin/knowledge']
   return [path]
